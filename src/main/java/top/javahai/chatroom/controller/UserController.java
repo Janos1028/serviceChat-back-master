@@ -1,14 +1,24 @@
 package top.javahai.chatroom.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.yaml.snakeyaml.events.Event;
+import top.javahai.chatroom.config.JwtProperties;
+import top.javahai.chatroom.constant.JwtClaimsConstant;
 import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
+import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.UserLoginVO;
 import top.javahai.chatroom.service.UserService;
 import org.springframework.web.bind.annotation.*;
+import top.javahai.chatroom.utils.JwtUtil;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * (User)表控制层
@@ -19,6 +29,40 @@ import java.util.List;
 @RestController
 @RequestMapping("/user")
 public class UserController {
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+    @Autowired
+    private JwtProperties jwtProperties;
+    /**
+     * 普通用户登录
+     */
+    @PostMapping("/login")
+    public RespBean userLogin(@RequestBody UserLoginDTO userLoginDTO) {
+        // 1. 调用 Service 校验用户名密码
+        User user = userService.login(userLoginDTO);
+
+        // 2. 生成 JWT
+        Map<String, Object> claims = new HashMap<>();
+        // 存入用户ID，Key 为 "userId"
+        claims.put(JwtClaimsConstant.USER_ID, user.getId());
+        claims.put(JwtClaimsConstant.USERNAME, user.getUsername());
+        claims.put(JwtClaimsConstant.NICKNAME, user.getNickname());
+
+        String token = JwtUtil.createJWT(
+                jwtProperties.getUserSecretKey(),
+                jwtProperties.getUserTtl(),
+                claims);
+
+        // 3. 封装 VO
+        UserLoginVO userLoginVO = new UserLoginVO(
+                user.getId(),
+                user.getUsername(),
+                user.getNickname(),
+                token
+        );
+
+        return RespBean.ok("登录成功", userLoginVO);
+    }
+
     /**
      * 服务对象
      */
@@ -63,7 +107,7 @@ public class UserController {
      * @param id 主键
      * @return 单条数据
      */
-    @GetMapping("selectOne")
+    @GetMapping("/selectOne")
     public User selectOne(Integer id) {
         return this.userService.queryById(id);
     }
@@ -80,6 +124,7 @@ public class UserController {
     public RespPageBean getAllUserByPage(@RequestParam(value = "page",defaultValue = "1") Integer page,
                                          @RequestParam(value = "size",defaultValue = "10") Integer size,
                                          String keyword,Integer isLocked){
+        log.info("getAllUserByPage: page={},size={},keyword={},isLocked={}",page,size,keyword,isLocked);
         return userService.getAllUserByPage(page,size,keyword,isLocked);
     }
 
@@ -129,4 +174,6 @@ public class UserController {
             return RespBean.error("删除失败！");
         }
     }
+
+
 }

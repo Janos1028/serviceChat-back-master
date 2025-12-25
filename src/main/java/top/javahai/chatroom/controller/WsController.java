@@ -6,6 +6,8 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import top.javahai.chatroom.entity.GroupMsgContent;
 import top.javahai.chatroom.entity.Message;
 import top.javahai.chatroom.entity.User;
@@ -20,7 +22,8 @@ import java.util.Date;
  * @author Hai
  * @date 2020/6/16 - 23:34
  */
-@Controller
+@RestController
+@RequestMapping("/user")
 public class WsController {
   @Autowired
   SimpMessagingTemplate simpMessagingTemplate;

@@ -15,7 +15,7 @@ import java.util.Date;
  * @date 2020/6/29 - 18:42
  */
 @RestController
-@RequestMapping("/mail")
+@RequestMapping("/user/mail")
 public class MailController {
 
   @Autowired

@@ -1,7 +1,7 @@
 package top.javahai.chatroom.service.impl;
 
 import top.javahai.chatroom.entity.UserState;
-import top.javahai.chatroom.dao.UserStateDao;
+import top.javahai.chatroom.mapper.UserStateMapper;
 import top.javahai.chatroom.service.UserStateService;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +17,7 @@ import java.util.List;
 @Service("userStateService")
 public class UserStateServiceImpl implements UserStateService {
     @Resource
-    private UserStateDao userStateDao;
+    private UserStateMapper userStateMapper;
 
     /**
      * 通过ID查询单条数据
@@ -27,7 +27,7 @@ public class UserStateServiceImpl implements UserStateService {
      */
     @Override
     public UserState queryById(Integer id) {
-        return this.userStateDao.queryById(id);
+        return this.userStateMapper.queryById(id);
     }
 
     /**
@@ -39,7 +39,7 @@ public class UserStateServiceImpl implements UserStateService {
      */
     @Override
     public List<UserState> queryAllByLimit(int offset, int limit) {
-        return this.userStateDao.queryAllByLimit(offset, limit);
+        return this.userStateMapper.queryAllByLimit(offset, limit);
     }
 
     /**
@@ -50,7 +50,7 @@ public class UserStateServiceImpl implements UserStateService {
      */
     @Override
     public UserState insert(UserState userState) {
-        this.userStateDao.insert(userState);
+        this.userStateMapper.insert(userState);
         return userState;
     }
 
@@ -62,7 +62,7 @@ public class UserStateServiceImpl implements UserStateService {
      */
     @Override
     public UserState update(UserState userState) {
-        this.userStateDao.update(userState);
+        this.userStateMapper.update(userState);
         return this.queryById(userState.getId());
     }
 
@@ -74,6 +74,6 @@ public class UserStateServiceImpl implements UserStateService {
      */
     @Override
     public boolean deleteById(Integer id) {
-        return this.userStateDao.deleteById(id) > 0;
+        return this.userStateMapper.deleteById(id) > 0;
     }
 }

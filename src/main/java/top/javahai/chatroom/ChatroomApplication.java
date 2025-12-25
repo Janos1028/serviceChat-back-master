@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @date 2020/6/16 - 12:45
  */
 @SpringBootApplication
-@MapperScan("top.javahai.chatroom.dao")
+@MapperScan("top.javahai.chatroom.mapper")
 public class ChatroomApplication {
   public static void main(String[] args) {
     SpringApplication.run(ChatroomApplication.class, args);

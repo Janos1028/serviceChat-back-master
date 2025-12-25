@@ -1,26 +1,39 @@
 package top.javahai.chatroom.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import top.javahai.chatroom.config.JwtProperties;
 import top.javahai.chatroom.config.VerificationCode;
+import top.javahai.chatroom.constant.JwtClaimsConstant;
+import top.javahai.chatroom.entity.Admin;
 import top.javahai.chatroom.entity.RespBean;
+import top.javahai.chatroom.entity.User;
+import top.javahai.chatroom.entity.dto.AdminLoginDTO;
+import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.AdminLoginVO;
+import top.javahai.chatroom.entity.vo.UserLoginVO;
+import top.javahai.chatroom.service.AdminService;
+import top.javahai.chatroom.service.UserService;
+import top.javahai.chatroom.utils.JwtUtil;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
-/**
- * @author Hai
- * @date 2020/6/16 - 17:33
- */
 @RestController
+@RequestMapping("/login")
+@Slf4j
 public class LoginController {
+
+
   /**
    * 获取验证码图片写到响应的输出流中，保存验证码到session
    * @param response
@@ -36,13 +49,11 @@ public class LoginController {
     VerificationCode.output(image,response.getOutputStream());
   }
 
-  @Autowired
-  JavaMailSender javaMailSender;
   /**
    * 获取邮箱验证码，并保存到本次会话
    * @param session
    */
-  @GetMapping("/admin/mailVerifyCode")
+  @GetMapping("/mailVerifyCode")
   public RespBean getMailVerifyCode(HttpSession session){
     // 生成一个固定的验证码用于直接放行
     String code = "1234"; // 固定验证码，或生成后直接设置为已验证状态

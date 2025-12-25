@@ -1,6 +1,8 @@
 package top.javahai.chatroom.service;
 
 import top.javahai.chatroom.entity.Admin;
+import top.javahai.chatroom.entity.dto.AdminLoginDTO;
+
 import java.util.List;
 
 /**
@@ -52,4 +54,10 @@ public interface AdminService {
      */
     boolean deleteById(Integer id);
 
+    /**
+     * 管理员登录
+     * @param adminLoginDTO
+     * @return
+     */
+    Admin login(AdminLoginDTO adminLoginDTO);
 }

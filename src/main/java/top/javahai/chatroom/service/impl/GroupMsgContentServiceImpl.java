@@ -1,7 +1,7 @@
 package top.javahai.chatroom.service.impl;
 
 import top.javahai.chatroom.entity.GroupMsgContent;
-import top.javahai.chatroom.dao.GroupMsgContentDao;
+import top.javahai.chatroom.mapper.GroupMsgContentMapper;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.service.GroupMsgContentService;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import java.util.List;
 @Service("groupMsgContentService")
 public class GroupMsgContentServiceImpl implements GroupMsgContentService {
     @Resource
-    private GroupMsgContentDao groupMsgContentDao;
+    private GroupMsgContentMapper groupMsgContentMapper;
 
     /**
      * 通过ID查询单条数据
@@ -29,7 +29,7 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
      */
     @Override
     public GroupMsgContent queryById(Integer id) {
-        return this.groupMsgContentDao.queryById(id);
+        return this.groupMsgContentMapper.queryById(id);
     }
 
     /**
@@ -41,7 +41,7 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
      */
     @Override
     public List<GroupMsgContent> queryAllByLimit(Integer offset, Integer limit) {
-        return this.groupMsgContentDao.queryAllByLimit(offset, limit);
+        return this.groupMsgContentMapper.queryAllByLimit(offset, limit);
     }
 
     /**
@@ -52,7 +52,7 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
      */
     @Override
     public GroupMsgContent insert(GroupMsgContent groupMsgContent) {
-        this.groupMsgContentDao.insert(groupMsgContent);
+        this.groupMsgContentMapper.insert(groupMsgContent);
         return groupMsgContent;
     }
 
@@ -64,7 +64,7 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
      */
     @Override
     public GroupMsgContent update(GroupMsgContent groupMsgContent) {
-        this.groupMsgContentDao.update(groupMsgContent);
+        this.groupMsgContentMapper.update(groupMsgContent);
         return this.queryById(groupMsgContent.getId());
     }
 
@@ -76,7 +76,7 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
      */
     @Override
     public boolean deleteById(Integer id) {
-        return this.groupMsgContentDao.deleteById(id) > 0;
+        return this.groupMsgContentMapper.deleteById(id) > 0;
     }
 
     @Override
@@ -84,8 +84,8 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
         if (page!=null&&size!=null){
             page=(page-1)*size;
         }
-        List<GroupMsgContent> allGroupMsgContentByPage = groupMsgContentDao.getAllGroupMsgContentByPage(page, size, nickname, type, dateScope);
-        Long total=groupMsgContentDao.getTotal(nickname, type, dateScope);
+        List<GroupMsgContent> allGroupMsgContentByPage = groupMsgContentMapper.getAllGroupMsgContentByPage(page, size, nickname, type, dateScope);
+        Long total= groupMsgContentMapper.getTotal(nickname, type, dateScope);
         RespPageBean respPageBean = new RespPageBean();
         respPageBean.setData(allGroupMsgContentByPage);
         respPageBean.setTotal(total);
@@ -94,6 +94,6 @@ public class GroupMsgContentServiceImpl implements GroupMsgContentService {
 
     @Override
     public Integer deleteGroupMsgContentByIds(Integer[] ids) {
-        return groupMsgContentDao.deleteGroupMsgContentByIds(ids);
+        return groupMsgContentMapper.deleteGroupMsgContentByIds(ids);
     }
 }

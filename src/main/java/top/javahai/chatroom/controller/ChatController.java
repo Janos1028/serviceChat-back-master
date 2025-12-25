@@ -14,7 +14,7 @@ import java.util.List;
  * @date 2020/6/16 - 21:32
  */
 @RestController
-@RequestMapping("/chat")
+@RequestMapping("/user/chat")
 public class ChatController {
   @Autowired
   UserService userService;

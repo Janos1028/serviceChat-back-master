@@ -1,5 +1,8 @@
 package top.javahai.chatroom.entity;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -11,6 +14,9 @@ import java.util.Collection;
  * @author makejava
  * @since 2020-06-16 12:08:01
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class User  implements UserDetails {
 
     private Integer id;
@@ -44,17 +50,7 @@ public class User  implements UserDetails {
     private Boolean isLocked;
 
 
-    public Integer getId() {
-        return id;
-    }
 
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
 
     //账号是否未过期
     @Override
@@ -78,17 +74,6 @@ public class User  implements UserDetails {
         return  isEnabled;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
 
     /**
      * 获取用户拥有的所有角色
@@ -99,29 +84,6 @@ public class User  implements UserDetails {
         return null;
     }
 
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getUserProfile() {
-        return userProfile;
-    }
-
-    public void setUserProfile(String userProfile) {
-        this.userProfile = userProfile;
-    }
-
-    public Integer getUserStateId() {
-        return userStateId;
-    }
-
-    public void setUserStateId(Integer userStateId) {
-        this.userStateId = userStateId;
-    }
 
 
     public void setEnabled(Boolean enabled) {

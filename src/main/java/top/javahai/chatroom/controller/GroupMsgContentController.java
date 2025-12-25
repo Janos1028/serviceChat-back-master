@@ -17,7 +17,7 @@ import java.util.List;
  * @since 2020-06-17 10:51:13
  */
 @RestController
-@RequestMapping("/groupMsgContent")
+@RequestMapping("/admin/groupMsgContent")
 public class GroupMsgContentController {
     /**
      * 服务对象
@@ -36,7 +36,7 @@ public class GroupMsgContentController {
      * @param id 主键
      * @return 单条数据
      */
-    @GetMapping("selectOne")
+    @GetMapping("/selectOne")
     public GroupMsgContent selectOne(Integer id) {
         return this.groupMsgContentService.queryById(id);
     }

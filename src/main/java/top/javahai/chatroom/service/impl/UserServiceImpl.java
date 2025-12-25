@@ -1,14 +1,11 @@
 package top.javahai.chatroom.service.impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.RequestParam;
-import top.javahai.chatroom.dao.UserDao;
-import top.javahai.chatroom.entity.RespBean;
+import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.mapper.UserMapper;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.service.UserService;
@@ -25,24 +22,11 @@ import java.util.List;
  * @since 2020-06-16 11:37:09
  */
 @Service("userService")
-public class UserServiceImpl implements UserService, UserDetailsService {
+public class UserServiceImpl implements UserService{
     @Resource
-    private UserDao userDao;
-
-    /**
-     * 根据用户名进行登录
-     * @param username
-     * @return
-     * @throws UsernameNotFoundException
-     */
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userDao.loadUserByUsername(username);
-        if (user==null){
-            throw new UsernameNotFoundException("用户不存在");
-        }
-        return user;
-    }
+    private UserMapper userMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * 获取除了当前用户的所有user表的数据
@@ -50,7 +34,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public List<User> getUsersWithoutCurrentUser() {
-        return userDao.getUsersWithoutCurrentUser(UserUtil.getCurrentUser().getId());
+        return userMapper.getUsersWithoutCurrentUser(UserUtil.getCurrentUser().getId());
     }
     /**
      * 设置用户当前状态为在线
@@ -58,7 +42,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public void setUserStateToOn(Integer id) {
-        userDao.setUserStateToOn(id);
+        userMapper.setUserStateToOn(id);
     }
     /**
      * 设置用户当前状态为离线
@@ -66,7 +50,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public void setUserStateToLeave(Integer id) {
-        userDao.setUserStateToLeave(id);
+        userMapper.setUserStateToLeave(id);
     }
 
     /**
@@ -77,7 +61,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public User queryById(Integer id) {
-        return this.userDao.queryById(id);
+        return this.userMapper.queryById(id);
     }
 
     /**
@@ -89,7 +73,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public List<User> queryAllByLimit(int offset, int limit) {
-        return this.userDao.queryAllByLimit(offset, limit);
+        return this.userMapper.queryAllByLimit(offset, limit);
     }
 
     /**
@@ -107,7 +91,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         user.setUserStateId(2);
         user.setEnabled(true);
         user.setLocked(false);
-        return  this.userDao.insert(user);
+        return  this.userMapper.insert(user);
     }
 
     /**
@@ -118,7 +102,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public Integer update(User user) {
-        return this.userDao.update(user);
+        return this.userMapper.update(user);
     }
 
     /**
@@ -129,17 +113,17 @@ public class UserServiceImpl implements UserService, UserDetailsService {
      */
     @Override
     public boolean deleteById(Integer id) {
-        return this.userDao.deleteById(id) > 0;
+        return this.userMapper.deleteById(id) > 0;
     }
 
     @Override
     public Integer checkUsername(String username) {
-        return userDao.checkUsername(username);
+        return userMapper.checkUsername(username);
     }
 
     @Override
     public Integer checkNickname(String nickname) {
-        return userDao.checkNickname(nickname);
+        return userMapper.checkNickname(nickname);
     }
 
     @Override
@@ -148,9 +132,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             page=(page-1)*size;//起始下标
         }
         //获取用户数据
-        List<User> userList=userDao.getAllUserByPage(page,size,keyword,isLocked);
+        List<User> userList= userMapper.getAllUserByPage(page,size,keyword,isLocked);
         //获取用户数据的总数
-        Long total=userDao.getTotal(keyword,isLocked);
+        Long total= userMapper.getTotal(keyword,isLocked);
         RespPageBean respPageBean = new RespPageBean();
         respPageBean.setData(userList);
         respPageBean.setTotal(total);
@@ -159,12 +143,26 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public Integer changeLockedStatus(Integer id, Boolean isLocked) {
-        return userDao.changeLockedStatus(id,isLocked);
+        return userMapper.changeLockedStatus(id,isLocked);
     }
 
   @Override
   public Integer deleteByIds(Integer[] ids) {
-    return userDao.deleteByIds(ids);
+    return userMapper.deleteByIds(ids);
   }
+
+    @Override
+    public User login(UserLoginDTO userLoginDTO) {
+        String username = userLoginDTO.getUsername();
+        String password = userLoginDTO.getPassword();
+        User user = userMapper.getUserByUsername(username);
+        if (user == null){
+            throw new UsernameNotFoundException("用户不存在");
+        }
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("密码错误");
+        }
+        return user;
+    }
 
 }

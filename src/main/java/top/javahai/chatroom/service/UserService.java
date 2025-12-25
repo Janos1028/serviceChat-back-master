@@ -3,6 +3,7 @@ package top.javahai.chatroom.service;
 import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
+import top.javahai.chatroom.entity.dto.UserLoginDTO;
 
 import java.util.List;
 
@@ -93,4 +94,6 @@ public interface UserService {
     Integer changeLockedStatus(Integer id, Boolean isLocked);
 
     Integer deleteByIds(Integer[] ids);
+
+    User login(UserLoginDTO userLoginDTO);
 }

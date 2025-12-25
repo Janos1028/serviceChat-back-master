@@ -1,10 +1,11 @@
 package top.javahai.chatroom.service.impl;
 
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import top.javahai.chatroom.entity.Admin;
-import top.javahai.chatroom.dao.AdminDao;
+import top.javahai.chatroom.entity.dto.AdminLoginDTO;
+import top.javahai.chatroom.mapper.AdminMapper;
 import top.javahai.chatroom.service.AdminService;
 import org.springframework.stereotype.Service;
 
@@ -18,24 +19,12 @@ import java.util.List;
  * @since 2020-06-16 11:35:58
  */
 @Service("adminService")
-public class AdminServiceImpl implements AdminService, UserDetailsService {
+public class AdminServiceImpl implements AdminService{
     @Resource
-    private AdminDao adminDao;
+    private AdminMapper adminMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
-    /**
-     * 根据用户名进行登录
-     * @param username
-     * @return
-     * @throws UsernameNotFoundException
-     */
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Admin admin=adminDao.loadUserByUsername(username);
-        if (admin==null){
-            throw new UsernameNotFoundException("找不到该管理员");
-        }
-        return admin;
-    }
     /**
      * 通过ID查询单条数据
      *
@@ -44,7 +33,7 @@ public class AdminServiceImpl implements AdminService, UserDetailsService {
      */
     @Override
     public Admin queryById(Integer id) {
-        return this.adminDao.queryById(id);
+        return this.adminMapper.queryById(id);
     }
 
     /**
@@ -56,7 +45,7 @@ public class AdminServiceImpl implements AdminService, UserDetailsService {
      */
     @Override
     public List<Admin> queryAllByLimit(int offset, int limit) {
-        return this.adminDao.queryAllByLimit(offset, limit);
+        return this.adminMapper.queryAllByLimit(offset, limit);
     }
 
     /**
@@ -67,7 +56,7 @@ public class AdminServiceImpl implements AdminService, UserDetailsService {
      */
     @Override
     public Admin insert(Admin admin) {
-        this.adminDao.insert(admin);
+        this.adminMapper.insert(admin);
         return admin;
     }
 
@@ -79,7 +68,7 @@ public class AdminServiceImpl implements AdminService, UserDetailsService {
      */
     @Override
     public Admin update(Admin admin) {
-        this.adminDao.update(admin);
+        this.adminMapper.update(admin);
         return this.queryById(admin.getId());
     }
 
@@ -91,7 +80,27 @@ public class AdminServiceImpl implements AdminService, UserDetailsService {
      */
     @Override
     public boolean deleteById(Integer id) {
-        return this.adminDao.deleteById(id) > 0;
+        return this.adminMapper.deleteById(id) > 0;
+    }
+
+    @Override
+    public Admin login(AdminLoginDTO adminLoginDTO) {
+        String username = adminLoginDTO.getUsername();
+        String password = adminLoginDTO.getPassword();
+
+        // 1. 根据用户名查询数据库
+        Admin admin = adminMapper.getAdminByUsername(username); // 假设 Mapper 有这个方法
+
+        // 2. 处理各种异常情况
+        if (admin == null) {
+            throw new RuntimeException("账号不存在"); // 建议使用自定义异常
+        }
+
+        if (!passwordEncoder.matches(password, admin.getPassword())) {
+            throw new RuntimeException("密码错误");
+        }
+
+        return admin;
     }
 
 }

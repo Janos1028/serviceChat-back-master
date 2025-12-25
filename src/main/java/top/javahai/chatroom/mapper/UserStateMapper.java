@@ -1,4 +1,4 @@
-package top.javahai.chatroom.dao;
+package top.javahai.chatroom.mapper;
 
 import top.javahai.chatroom.entity.UserState;
 import org.apache.ibatis.annotations.Param;
@@ -10,7 +10,7 @@ import java.util.List;
  * @author makejava
  * @since 2020-06-16 11:36:02
  */
-public interface UserStateDao {
+public interface UserStateMapper {
 
     /**
      * 通过ID查询单条数据

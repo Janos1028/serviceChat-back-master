@@ -1,4 +1,4 @@
-package top.javahai.chatroom.dao;
+package top.javahai.chatroom.mapper;
 
 import top.javahai.chatroom.entity.Admin;
 import org.apache.ibatis.annotations.Param;
@@ -10,10 +10,10 @@ import java.util.List;
  * @author makejava
  * @since 2020-06-16 11:35:57
  */
-public interface AdminDao {
+public interface AdminMapper {
 
 
-    Admin loadUserByUsername(String username);
+    Admin getAdminByUsername(String username);
 
     /**
      * 通过ID查询单条数据

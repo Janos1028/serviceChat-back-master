@@ -1,6 +1,5 @@
-package top.javahai.chatroom.dao;
+package top.javahai.chatroom.mapper;
 
-import org.yaml.snakeyaml.events.Event;
 import top.javahai.chatroom.entity.User;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -11,14 +10,14 @@ import java.util.List;
  * @author makejava
  * @since 2020-06-16 12:06:29
  */
-public interface UserDao {
+public interface UserMapper {
 
     /**
      * 根据用户名查询用户对象
      * @param username
      * @return
      */
-    User loadUserByUsername(String username);
+    User getUserByUsername(String username);
 
 
     /**

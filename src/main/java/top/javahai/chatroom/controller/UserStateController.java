@@ -13,7 +13,7 @@ import javax.annotation.Resource;
  * @since 2020-06-16 11:36:02
  */
 @RestController
-@RequestMapping("userState")
+@RequestMapping("/user/userState")
 public class UserStateController {
     /**
      * 服务对象
@@ -27,7 +27,7 @@ public class UserStateController {
      * @param id 主键
      * @return 单条数据
      */
-    @GetMapping("selectOne")
+    @GetMapping("/selectOne")
     public UserState selectOne(Integer id) {
         return this.userStateService.queryById(id);
     }

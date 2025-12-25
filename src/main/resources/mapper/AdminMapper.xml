@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="top.javahai.chatroom.dao.AdminDao">
+<mapper namespace="top.javahai.chatroom.mapper.AdminMapper">
 
     <resultMap type="top.javahai.chatroom.entity.Admin" id="AdminMap">
         <result property="id" column="id" jdbcType="INTEGER"/>
@@ -11,8 +11,8 @@
     </resultMap>
 
 
-    <select id="loadUserByUsername" resultMap="AdminMap">
-        select * from admin where admin.username=#{username}
+    <select id="getAdminByUsername" resultMap="AdminMap">
+        select id, username, nickname from admin where username=#{username}
     </select>
     <!--查询单个-->
     <select id="queryById" resultMap="AdminMap">

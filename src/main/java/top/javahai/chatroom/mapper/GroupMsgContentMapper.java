@@ -1,8 +1,7 @@
-package top.javahai.chatroom.dao;
+package top.javahai.chatroom.mapper;
 
 import top.javahai.chatroom.entity.GroupMsgContent;
 import org.apache.ibatis.annotations.Param;
-import top.javahai.chatroom.entity.RespPageBean;
 
 import java.util.Date;
 import java.util.List;
@@ -13,7 +12,7 @@ import java.util.List;
  * @author makejava
  * @since 2020-06-17 10:51:13
  */
-public interface GroupMsgContentDao {
+public interface GroupMsgContentMapper {
 
     /**
      * 通过ID查询单条数据
