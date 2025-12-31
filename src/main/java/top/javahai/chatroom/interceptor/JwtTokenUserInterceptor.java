@@ -46,6 +46,7 @@ public class JwtTokenUserInterceptor implements HandlerInterceptor {
             user.setId(Integer.valueOf(claims.get(JwtClaimsConstant.USER_ID).toString()));
             user.setUsername(claims.get(JwtClaimsConstant.USERNAME).toString());
             user.setNickname(claims.get(JwtClaimsConstant.NICKNAME).toString());
+            user.setUserTypeId(Integer.valueOf(claims.get(JwtClaimsConstant.USERTYPEID).toString()));
             BaseContext.setCurrent(user);
             return true;
         } catch (Exception ex) {

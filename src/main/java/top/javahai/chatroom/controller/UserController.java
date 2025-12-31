@@ -6,16 +6,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.yaml.snakeyaml.events.Event;
 import top.javahai.chatroom.config.JwtProperties;
 import top.javahai.chatroom.constant.JwtClaimsConstant;
+import top.javahai.chatroom.entity.GroupMsgContent;
 import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
 import top.javahai.chatroom.entity.vo.UserLoginVO;
+import top.javahai.chatroom.service.GroupMsgContentService;
 import top.javahai.chatroom.service.UserService;
 import org.springframework.web.bind.annotation.*;
 import top.javahai.chatroom.utils.JwtUtil;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +40,26 @@ public class UserController {
      * 普通用户登录
      */
     @PostMapping("/login")
-    public RespBean userLogin(@RequestBody UserLoginDTO userLoginDTO) {
+    public RespBean userLogin(@RequestBody UserLoginDTO userLoginDTO, HttpServletRequest request) {
+        log.info("userLogin: userLoginDTO={}",userLoginDTO);
+        HttpSession session = request.getSession();
+        // 3. 取出刚才生成图片时存入的正确验证码
+        String sessionCode = (String) session.getAttribute("verify_code");
+
+        // 4. 获取用户输入的验证码
+        String userCode = userLoginDTO.getCode();
+
+        // 5. 进行校验
+        if (sessionCode == null) {
+            return RespBean.error("验证码已过期，请刷新重试");
+        }
+        // 忽略大小写比对 (比如输入 A 和 a 都可以)
+        if (userCode == null || !sessionCode.equalsIgnoreCase(userCode)) {
+            return RespBean.error("验证码错误");
+        }
+
+        // 6. 校验通过后，建议清除 Session 中的验证码，防止重复使用
+        session.removeAttribute("verify_code");
         // 1. 调用 Service 校验用户名密码
         User user = userService.login(userLoginDTO);
 
@@ -46,6 +69,7 @@ public class UserController {
         claims.put(JwtClaimsConstant.USER_ID, user.getId());
         claims.put(JwtClaimsConstant.USERNAME, user.getUsername());
         claims.put(JwtClaimsConstant.NICKNAME, user.getNickname());
+        claims.put(JwtClaimsConstant.USERTYPEID, user.getUserTypeId());
 
         String token = JwtUtil.createJWT(
                 jwtProperties.getUserSecretKey(),
@@ -57,6 +81,8 @@ public class UserController {
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
+                user.getUserTypeId(),
+                user.getUserProfile(),
                 token
         );
 
@@ -109,7 +135,7 @@ public class UserController {
      */
     @GetMapping("/selectOne")
     public User selectOne(Integer id) {
-        return this.userService.queryById(id);
+        return userService.selectUser(id);
     }
 
     /**
@@ -128,52 +154,14 @@ public class UserController {
         return userService.getAllUserByPage(page,size,keyword,isLocked);
     }
 
-    /**
-     * 更新用户的锁定状态
-     * @author luo
-     * @param id
-     * @param isLocked
-     * @return
-     */
-    @PutMapping("/")
-    public RespBean changeLockedStatus(@RequestParam("id") Integer id,@RequestParam("isLocked") Boolean isLocked){
-      if (userService.changeLockedStatus(id,isLocked)==1){
-          return RespBean.ok("更新成功！");
-      }else {
-          return RespBean.error("更新失败！");
-      }
-    }
 
-    /**
-     * 删除单一用户
-     * @author luo
-     * @param id
-     * @return
-     */
-    @DeleteMapping("/{id}")
-    public RespBean deleteUser(@PathVariable Integer id){
-        if (userService.deleteById(id)){
-            return RespBean.ok("删除成功！");
-        }
-        else{
-            return RespBean.error("删除失败！");
-        }
-    }
 
-    /**
-     * 批量删除用户
-     * @author luo
-     * @param ids
-     * @return
-     */
-    @DeleteMapping("/")
-    public RespBean deleteUserByIds(Integer[] ids){
-        if (userService.deleteByIds(ids)==ids.length){
-            return RespBean.ok("删除成功！");
-        }else{
-            return RespBean.error("删除失败！");
-        }
-    }
+    @Resource
+    private GroupMsgContentService groupMsgContentService;
 
+    @GetMapping("/getAllGroupMsgContent")
+    private List<GroupMsgContent> getAllGroupMsgContent(){
+        return groupMsgContentService.queryAllByLimit(null,null);
+    }
 
 }

@@ -1,15 +1,17 @@
 package top.javahai.chatroom.service.impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.DigestUtils;
 import top.javahai.chatroom.entity.Admin;
 import top.javahai.chatroom.entity.dto.AdminLoginDTO;
+import top.javahai.chatroom.handler.exception.AccountNotFoundException;
+import top.javahai.chatroom.handler.exception.PasswordErrorException;
 import top.javahai.chatroom.mapper.AdminMapper;
 import top.javahai.chatroom.service.AdminService;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -22,8 +24,6 @@ import java.util.List;
 public class AdminServiceImpl implements AdminService{
     @Resource
     private AdminMapper adminMapper;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     /**
      * 通过ID查询单条数据
@@ -93,11 +93,15 @@ public class AdminServiceImpl implements AdminService{
 
         // 2. 处理各种异常情况
         if (admin == null) {
-            throw new RuntimeException("账号不存在"); // 建议使用自定义异常
+            throw new AccountNotFoundException("账号不存在"); // 建议使用自定义异常
         }
 
-        if (!passwordEncoder.matches(password, admin.getPassword())) {
-            throw new RuntimeException("密码错误");
+        // 使用 MD5 验证密码
+        // 将输入的密码进行 MD5 加密后与数据库中存储的密文比对
+        String inputPass = DigestUtils.md5DigestAsHex(password.getBytes(StandardCharsets.UTF_8));
+
+        if (!inputPass.equals(admin.getPassword())) {
+            throw new PasswordErrorException("密码错误");
         }
 
         return admin;

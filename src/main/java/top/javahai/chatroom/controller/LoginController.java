@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Random;
 
 @RestController
-@RequestMapping("/login")
+@RequestMapping
 @Slf4j
 public class LoginController {
 
@@ -45,6 +45,7 @@ public class LoginController {
     VerificationCode code = new VerificationCode();
     BufferedImage image = code.getImage();
     String text = code.getText();
+    log.info("验证码：{}",text);
     session.setAttribute("verify_code",text);
     VerificationCode.output(image,response.getOutputStream());
   }

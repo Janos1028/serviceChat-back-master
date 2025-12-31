@@ -2,6 +2,8 @@ package top.javahai.chatroom.mapper;
 
 import top.javahai.chatroom.entity.User;
 import org.apache.ibatis.annotations.Param;
+import top.javahai.chatroom.entity.vo.UserGetVO;
+
 import java.util.List;
 
 /**
@@ -22,10 +24,11 @@ public interface UserMapper {
 
     /**
      * 获取除当前用户的所有用户
+     *
      * @param id
      * @return
      */
-    List<User> getUsersWithoutCurrentUser(Integer id);
+    List<UserGetVO> getUsersWithoutCurrentUser(Integer id);
 
     /**
      * 通过ID查询单条数据
@@ -33,7 +36,7 @@ public interface UserMapper {
      * @param id 主键
      * @return 实例对象
      */
-    User queryById(Integer id);
+    UserGetVO queryById(Integer id);
 
     /**
      * 查询指定行数据
@@ -92,4 +95,8 @@ public interface UserMapper {
     Integer changeLockedStatus(@Param("id") Integer id, @Param("isLocked") Boolean isLocked);
 
   Integer deleteByIds(@Param("ids") Integer[] ids);
+
+    List<UserGetVO> ConstantGetUsersWithoutCurrentUser(Integer id);
+
+    User selectUser(Integer id);
 }

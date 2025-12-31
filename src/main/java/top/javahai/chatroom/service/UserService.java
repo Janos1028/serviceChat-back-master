@@ -1,9 +1,9 @@
 package top.javahai.chatroom.service;
 
-import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.UserGetVO;
 
 import java.util.List;
 
@@ -18,9 +18,10 @@ public interface UserService {
 
     /**
      * 获取除了当前登录用户的所有user表的数据
+     *
      * @return
      */
-    List<User> getUsersWithoutCurrentUser();
+    List<UserGetVO> getUsersWithoutCurrentUser();
 
     /**
      * 设置用户当前状态为在线
@@ -40,7 +41,7 @@ public interface UserService {
      * @param id 主键
      * @return 实例对象
      */
-    User queryById(Integer id);
+    UserGetVO queryById(Integer id);
 
     /**
      * 查询多条数据
@@ -96,4 +97,6 @@ public interface UserService {
     Integer deleteByIds(Integer[] ids);
 
     User login(UserLoginDTO userLoginDTO);
+
+    User selectUser(Integer id);
 }

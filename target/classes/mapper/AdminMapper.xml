@@ -11,8 +11,8 @@
     </resultMap>
 
 
-    <select id="loadUserByUsername" resultMap="AdminMap">
-        select * from admin where admin.username=#{username}
+    <select id="getAdminByUsername" resultMap="AdminMap">
+        select id, username, nickname , password, user_profile from admin where username=#{username}
     </select>
     <!--查询单个-->
     <select id="queryById" resultMap="AdminMap">

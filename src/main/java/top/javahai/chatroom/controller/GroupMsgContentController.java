@@ -17,7 +17,7 @@ import java.util.List;
  * @since 2020-06-17 10:51:13
  */
 @RestController
-@RequestMapping("/admin/groupMsgContent")
+@RequestMapping("/admin/GroupMsgContent")
 public class GroupMsgContentController {
     /**
      * 服务对象
@@ -25,7 +25,7 @@ public class GroupMsgContentController {
     @Resource
     private GroupMsgContentService groupMsgContentService;
 
-    @GetMapping("/")
+    @GetMapping("/getAllGroupMsgContent")
     private List<GroupMsgContent> getAllGroupMsgContent(){
         return groupMsgContentService.queryAllByLimit(null,null);
     }
@@ -51,7 +51,7 @@ public class GroupMsgContentController {
      * @param dateScope 发送时间范围
      * @return
      */
-    @GetMapping("/page")
+    @GetMapping("/getAllGroupMsgContentByPage")
     public RespPageBean getAllGroupMsgContentByPage(@RequestParam(value = "page",defaultValue = "1") Integer page,
                                                     @RequestParam(value = "size",defaultValue = "10") Integer size,
                                                     String nickname, Integer type,
@@ -65,7 +65,7 @@ public class GroupMsgContentController {
      * @param id
      * @return
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/deleteGroupMsgContentById/{id}")
     public RespBean deleteGroupMsgContentById(@PathVariable Integer id){
         if (groupMsgContentService.deleteById(id)){
             return RespBean.ok("删除成功！");
@@ -73,7 +73,7 @@ public class GroupMsgContentController {
             return RespBean.error("删除失败！");
         }
     }
-    @DeleteMapping("/")
+    @DeleteMapping("/deleteGroupMsgContentByIds")
     public RespBean deleteGroupMsgContentByIds(Integer[] ids){
         if (groupMsgContentService.deleteGroupMsgContentByIds(ids)==ids.length){
             return RespBean.ok("删除成功！");

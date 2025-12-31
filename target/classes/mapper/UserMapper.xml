@@ -11,21 +11,22 @@
         <result property="userStateId" column="user_state_id" jdbcType="INTEGER"/>
         <result property="isEnabled" column="is_enabled" jdbcType="OTHER"/>
         <result property="isLocked" column="is_locked" jdbcType="OTHER"/>
+        <result property="userTypeId" column="user_type_id" jdbcType="INTEGER"/>
     </resultMap>
 <!--根据用户名查询用户 -->
-    <select id="loadUserByUsername" resultMap="UserMap">
-        select * from user where username=#{username}
+    <select id="getUserByUsername" resultMap="UserMap">
+        select id, username, nickname, password ,user_profile, user_state_id, is_enabled, is_locked , user_type_id from user where username=#{username}
     </select>
 
 <!--获取所有用户数据 -->
     <select id="getUsersWithoutCurrentUser" resultMap="UserMap" parameterType="java.lang.Integer">
-        select id, username, nickname, user_profile, user_state_id, is_enabled, is_locked from user where id!=#{id}
+        select id, username, nickname, user_profile, user_state_id, is_enabled, is_locked ,user_type_id from user where id!=#{id} and id = 1 and is_locked = 0
     </select>
 
     <!--查询单个-->
-    <select id="queryById" resultMap="UserMap">
+    <select id="queryById" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
         select
-          id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked
+          id, username, nickname,  user_profile, user_state_id, user_type_id
         from user
         where id = #{id}
     </select>
@@ -144,6 +145,12 @@
         <if test="isLocked!=null">
             and is_locked =#{isLocked}
         </if>
+    </select>
+    <select id="ConstantGetUsersWithoutCurrentUser" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
+        select id, username, nickname, password, user_profile, user_state_id from user where id!=1 and is_locked = 0
+    </select>
+    <select id="selectUser" resultType="top.javahai.chatroom.entity.User">
+        select id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked, user_type_id from user where id = #{id}
     </select>
     <update id="changeLockedStatus">
         update user set is_locked=#{isLocked} where id=#{id}

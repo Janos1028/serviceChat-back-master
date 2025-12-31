@@ -1,97 +1,89 @@
 package top.javahai.chatroom.controller;
 
-import com.github.binarywang.java.emoji.EmojiConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import top.javahai.chatroom.entity.GroupMsgContent;
+import top.javahai.chatroom.config.UserPrincipal;
 import top.javahai.chatroom.entity.Message;
+import top.javahai.chatroom.entity.PrivateMsgContent;
 import top.javahai.chatroom.entity.User;
-import top.javahai.chatroom.service.GroupMsgContentService;
+import top.javahai.chatroom.mapper.UserMapper;
+import top.javahai.chatroom.service.PrivateChatService;
 import top.javahai.chatroom.utils.TuLingUtil;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
+import java.security.Principal;
 import java.util.Date;
 
-/**
- * @author Hai
- * @date 2020/6/16 - 23:34
- */
-@RestController
-@RequestMapping("/user")
+@Controller
 public class WsController {
-  @Autowired
-  SimpMessagingTemplate simpMessagingTemplate;
 
-  /**
-   * 单聊的消息的接受与转发
-   * @param authentication
-   * @param message
-   */
+  @Autowired
+  private SimpMessagingTemplate simpMessagingTemplate;
+
+  @Autowired
+  private PrivateChatService privateChatService;
+
+  @Autowired
+  private UserMapper userMapper;
+
   @MessageMapping("/ws/chat")
-  public void handleMessage(Authentication authentication, Message message){
-    User user= ((User) authentication.getPrincipal());
-    message.setFromNickname(user.getNickname());
-    message.setFrom(user.getUsername());
-    message.setCreateTime(new Date());
-    simpMessagingTemplate.convertAndSendToUser(message.getTo(),"/queue/chat",message);
+  public void handlePrivateMessage(Principal principal, Message message) {
+    try {
+      System.out.println("【WS消息】收到消息请求...");
+
+      // 简单写一下核心逻辑
+      String fromUsername = principal.getName();
+      User fromUser = userMapper.getUserByUsername(fromUsername);
+      User toUser = userMapper.getUserByUsername(message.getTo());
+
+      String conversationId = privateChatService.getActiveConversationId(fromUser.getId(), toUser.getId());
+      if (conversationId != null) {
+        PrivateMsgContent privateMsg = new PrivateMsgContent();
+        privateMsg.setFromId(fromUser.getId());
+        privateMsg.setToId(toUser.getId());
+        privateMsg.setContent(message.getContent());
+        privateMsg.setCreateTime(new Date());
+        privateMsg.setMessageTypeId(message.getMessageTypeId() != null ? message.getMessageTypeId() : 1);
+        privateMsg.setConversationId(conversationId);
+        privateMsg.setFromName(fromUser.getNickname());
+        privateMsg.setFromProfile(fromUser.getUserProfile());
+        privateChatService.saveMsg(privateMsg);
+      }
+
+      message.setFrom(fromUsername);
+      message.setFromNickname(fromUser.getNickname());
+      message.setFromUserProfile(fromUser.getUserProfile());
+      message.setCreateTime(new Date());
+      if (message.getMessageTypeId() == null) {
+        message.setMessageTypeId(1);
+      }
+      simpMessagingTemplate.convertAndSendToUser(toUser.getUsername(), "/queue/chat", message);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
-
-  @Autowired
-  GroupMsgContentService groupMsgContentService;
-  EmojiConverter emojiConverter = EmojiConverter.getInstance();
-
-  SimpleDateFormat dateFormat=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
   /**
-   * 群聊的消息接受与转发
-   * @param authentication
-   * @param groupMsgContent
-   */
-  @MessageMapping("/ws/groupChat")
-  public void handleGroupMessage(Authentication authentication, GroupMsgContent groupMsgContent){
-    User currentUser= (User) authentication.getPrincipal();
-    //处理emoji内容,转换成unicode编码
-    groupMsgContent.setContent(emojiConverter.toHtml(groupMsgContent.getContent()));
-    //保证来源正确性，从Security中获取用户信息
-    groupMsgContent.setFromId(currentUser.getId());
-    groupMsgContent.setFromName(currentUser.getNickname());
-    groupMsgContent.setFromProfile(currentUser.getUserProfile());
-    groupMsgContent.setCreateTime(new Date());
-    //保存该条群聊消息记录到数据库中
-    groupMsgContentService.insert(groupMsgContent);
-    //转发该条数据
-    simpMessagingTemplate.convertAndSend("/topic/greetings",groupMsgContent);
-  }
-
-  /**
-   * 接受前端发来的消息，获得图灵机器人回复并转发回给发送者
-   * @param authentication
-   * @param message
-   * @throws IOException
+   * 机器人聊天
    */
   @MessageMapping("/ws/robotChat")
-  public void handleRobotChatMessage(Authentication authentication, Message message) throws IOException {
-    User user = ((User) authentication.getPrincipal());
-    //接收到的消息
+  public void handleRobotChatMessage(Principal principal, Message message) throws IOException {
+    User user = ((UserPrincipal) principal).getUser();
     message.setFrom(user.getUsername());
     message.setCreateTime(new Date());
     message.setFromNickname(user.getNickname());
     message.setFromUserProfile(user.getUserProfile());
-    //发送消息内容给机器人，获得回复
+
     String result = TuLingUtil.replyMessage(message.getContent());
-    //构建返回消息JSON字符串
+
     Message resultMessage = new Message();
     resultMessage.setFrom("瓦力");
     resultMessage.setCreateTime(new Date());
     resultMessage.setFromNickname("瓦力");
     resultMessage.setContent(result);
-    //回送机器人回复的消息给发送者
-    simpMessagingTemplate.convertAndSendToUser(message.getFrom(),"/queue/robot",resultMessage);
 
+    simpMessagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/robot", resultMessage);
   }
 }

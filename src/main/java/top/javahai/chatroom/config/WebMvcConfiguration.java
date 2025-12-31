@@ -27,6 +27,14 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
         // 假设用户端接口以 /user 或其他开头，根据实际 Controller 调整
         registry.addInterceptor(jwtTokenUserInterceptor)
                 .addPathPatterns("/user/**")
-                .excludePathPatterns("/user/login", "/user/register", "/doLogin", "/login");
+                .excludePathPatterns(
+                        "/user/login",
+                        "/user/register",
+                        "/doLogin",
+                        "/login",
+                        "/user/checkUsername",
+                        "/user/checkNickname",
+                        "/user/public/uploadAvatar"
+                );
     }
 }

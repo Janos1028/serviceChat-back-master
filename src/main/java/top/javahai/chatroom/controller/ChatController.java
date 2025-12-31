@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.javahai.chatroom.entity.User;
+import top.javahai.chatroom.entity.vo.UserGetVO;
 import top.javahai.chatroom.service.UserService;
 
 import java.util.List;
@@ -19,8 +20,15 @@ public class ChatController {
   @Autowired
   UserService userService;
 
-  @GetMapping("/users")
-  public List<User> getUsersWithoutCurrentUser(){
+  @GetMapping("/getUsersWithoutCurrentUser")
+  public List<UserGetVO> getUsersWithoutCurrentUser(){
     return userService.getUsersWithoutCurrentUser();
   }
+
+  @GetMapping("/choseUser")
+  public UserGetVO choseUser(Integer id){
+    return userService.queryById(id);
+  }
+
+
 }
