@@ -36,7 +36,7 @@ public interface UserMapper {
      * @param id 主键
      * @return 实例对象
      */
-    UserGetVO queryById(Integer id);
+    User queryById(Integer id);
 
     /**
      * 查询指定行数据
@@ -99,4 +99,6 @@ public interface UserMapper {
     List<UserGetVO> ConstantGetUsersWithoutCurrentUser(Integer id);
 
     User selectUser(Integer id);
+
+
 }

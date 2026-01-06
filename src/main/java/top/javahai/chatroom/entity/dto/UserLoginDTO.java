@@ -11,4 +11,5 @@ public class UserLoginDTO {
     private String username;
     private String password;
     private String code;
+    private String verifyKey; // 验证码在 Redis 中的 Key
 }

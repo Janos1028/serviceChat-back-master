@@ -9,6 +9,7 @@ import top.javahai.chatroom.entity.PrivateMsgContent;
 import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.vo.UserGetVO;
+import top.javahai.chatroom.handler.exception.StartConversationFailedException;
 import top.javahai.chatroom.mapper.PrivateChatConversationMapper;
 import top.javahai.chatroom.mapper.PrivateMsgContentMapper;
 import top.javahai.chatroom.mapper.UserMapper;
@@ -35,10 +36,16 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     @Override
     public RespBean startConversation(Integer fromId, Integer toId) {
         // 0. 【核心修改】安全校验：检查发起者的身份
-        UserGetVO fromUser = userMapper.queryById(fromId);
-        if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId() == 1) {
-            return RespBean.error("您的账号权限不足，无法主动开启会话");
+        User fromUser = userMapper.queryById(fromId);
+        // 安全校验：检查接收者的身份
+        User toUser = userMapper.queryById(toId);
+        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 0) {
+            throw new StartConversationFailedException("您的账号权限不足，无法主动开启会话");
         }
+        if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId() == 1) {
+            throw new StartConversationFailedException("您的账号权限不足，无法主动开启会话");
+        }
+
         // 1. 查库
         PrivateChatConversation active = conversationMapper.getActiveConversation(fromId, toId);
         String conversationId;
@@ -81,7 +88,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             conv.setEndTime(new Date());
             conversationMapper.update(conv);
 
-            // 【核心修改】存入数据库！Type=5 代表会话结束
+            // 存入数据库！Type=5 代表会话结束
             saveAndPushSystemMessage(conv.getUserId1(), conv.getUserId2(), conversationId, 5, "会话已结束");
 
             // Redis 移除
@@ -132,7 +139,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         sysMsg.setMessageTypeId(type); // 4=Start, 5=End
         sysMsg.setConversationId(convId);
 
-        UserGetVO u = userMapper.queryById(fromId);
+        User u = userMapper.queryById(fromId);
         if(u != null) {
             sysMsg.setFromName(u.getNickname());
             sysMsg.setFromProfile(u.getUserProfile());
@@ -169,7 +176,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         simpMessagingTemplate.convertAndSendToUser(user2.getUsername(), "/queue/chat", msgFor2);
     }
     private void sendGreetingMsg(Integer fromId, Integer toId, String convId) {
-        UserGetVO fromUser = userMapper.queryById(fromId);
+        User fromUser = userMapper.queryById(fromId);
         User toUser = userMapper.getUserByUsername(userMapper.queryById(toId).getUsername());
 
         PrivateMsgContent greeting = new PrivateMsgContent();
@@ -204,8 +211,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     }
 
     private void sendWsStatus(Integer u1, Integer u2, String convId, String type) {
-        UserGetVO user1 = userMapper.queryById(u1);
-        UserGetVO user2 = userMapper.queryById(u2);
+        User user1 = userMapper.queryById(u1);
+        User user2 = userMapper.queryById(u2);
 
         Map<String, Object> msg = new HashMap<>();
         msg.put("type", type);

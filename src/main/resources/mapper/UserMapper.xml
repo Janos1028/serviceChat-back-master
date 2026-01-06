@@ -13,28 +13,68 @@
         <result property="isLocked" column="is_locked" jdbcType="OTHER"/>
         <result property="userTypeId" column="user_type_id" jdbcType="INTEGER"/>
     </resultMap>
-<!--根据用户名查询用户 -->
+    <!--根据用户名查询用户 -->
     <select id="getUserByUsername" resultMap="UserMap">
-        select id, username, nickname, password ,user_profile, user_state_id, is_enabled, is_locked , user_type_id from user where username=#{username}
+        select id,
+               username,
+               nickname,
+               password,
+               user_profile,
+               user_state_id,
+               is_enabled,
+               is_locked,
+               user_type_id
+        from user
+        where username = #{username}
     </select>
 
-<!--获取所有用户数据 -->
+    <!--获取所有用户数据 -->
     <select id="getUsersWithoutCurrentUser" resultMap="UserMap" parameterType="java.lang.Integer">
-        select id, username, nickname, user_profile, user_state_id, is_enabled, is_locked ,user_type_id from user where id!=#{id} and id = 1 and is_locked = 0
+        select id,
+               username,
+               nickname,
+               user_profile,
+               user_state_id,
+               is_enabled,
+               is_locked,
+               user_type_id,
+               (
+                   SELECT MAX(create_time)
+                   FROM private_msg_content p
+                   WHERE (p.from_id = u.id AND p.to_id = #{id})
+                      OR (p.from_id = #{id} AND p.to_id = u.id)
+               ) as lastMessageTime
+        from user u
+        where id != #{id}
+          and user_type_id = 1
+          and is_locked = 0
+        order by
+        lastMessageTime DESC,
+        u.user_state_id ASC
     </select>
 
     <!--查询单个-->
-    <select id="queryById" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
-        select
-          id, username, nickname,  user_profile, user_state_id, user_type_id
+    <select id="queryById" resultType="top.javahai.chatroom.entity.User">
+        select id,
+               username,
+               nickname,
+               user_profile,
+               user_state_id,
+               user_type_id
         from user
         where id = #{id}
     </select>
 
     <!--查询指定行数据-->
     <select id="queryAllByLimit" resultMap="UserMap">
-        select
-          id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked
+        select id,
+               username,
+               nickname,
+               password,
+               user_profile,
+               user_state_id,
+               is_enabled,
+               is_locked
         from user
         limit #{offset}, #{limit}
     </select>
@@ -42,7 +82,7 @@
     <!--通过实体作为筛选条件查询-->
     <select id="queryAll" resultMap="UserMap">
         select
-          id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked
+        id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked
         from user
         <where>
             <if test="id != null">
@@ -75,7 +115,8 @@
     <!--新增所有列-->
     <insert id="insert" keyProperty="id" useGeneratedKeys="true">
         insert into user(username, nickname, password, user_profile, user_state_id, is_enabled, is_locked, user_type_id)
-        values (#{username}, #{nickname}, #{password}, #{userProfile}, #{userStateId}, #{isEnabled}, #{isLocked}, #{userTypeId})
+        values (#{username}, #{nickname}, #{password}, #{userProfile}, #{userStateId}, #{isEnabled}, #{isLocked},
+                #{userTypeId})
     </insert>
 
     <!--通过主键修改数据-->
@@ -109,33 +150,43 @@
 
     <!--通过主键删除-->
     <delete id="deleteById">
-        delete from user where id = #{id}
+        delete
+        from user
+        where id = #{id}
     </delete>
 
     <update id="setUserStateToOn">
-       update user set user_state_id=1 where id=#{id}
+        update user
+        set user_state_id=1
+        where id = #{id}
     </update>
     <update id="setUserStateToLeave">
-        update user set user_state_id=2 where id=#{id}
+        update user
+        set user_state_id=2
+        where id = #{id}
     </update>
     <select id="checkUsername" resultType="java.lang.Integer">
-        select count(*) from user where username=#{username}
+        select count(*)
+        from user
+        where username = #{username}
     </select>
     <select id="checkNickname" resultType="java.lang.Integer">
-        select count(*) from user where nickname=#{nickname}
+        select count(*)
+        from user
+        where nickname = #{nickname}
     </select>
-<!--    按条件查询所有的用户-->
+    <!--    按条件查询所有的用户-->
     <select id="getAllUserByPage" resultMap="UserMap">
-      select * from user where 1=1
-      <if test="keyword!=null and keyword!=''">
-         and nickname like concat('%',#{keyword},'%')
-      </if>
-      <if test="isLocked!=null">
-          and is_locked =#{isLocked}
-      </if>
-      <if test="page!=null and size!=null">
-          limit #{page},#{size}
-      </if>
+        select * from user where 1=1
+        <if test="keyword!=null and keyword!=''">
+            and nickname like concat('%',#{keyword},'%')
+        </if>
+        <if test="isLocked!=null">
+            and is_locked =#{isLocked}
+        </if>
+        <if test="page!=null and size!=null">
+            limit #{page},#{size}
+        </if>
     </select>
     <select id="getTotal" resultType="java.lang.Long">
         select count(*) from user where 1=1
@@ -147,13 +198,38 @@
         </if>
     </select>
     <select id="ConstantGetUsersWithoutCurrentUser" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
-        select id, username, nickname, password, user_profile, user_state_id from user where id!=1 and is_locked = 0
+        select id, username, nickname, password, user_profile, user_state_id, user_type_id
+        from user u
+        where id != #{id}
+          and is_locked = 0
+        ORDER BY
+            (
+                SELECT MAX(create_time)
+                FROM private_msg_content p
+                WHERE (p.from_id = u.id AND p.to_id = #{id})
+                   OR (p.from_id = #{id} AND p.to_id = u.id)
+            ) DESC,
+            u.user_state_id ASC
     </select>
     <select id="selectUser" resultType="top.javahai.chatroom.entity.User">
-        select id, username, nickname, password, user_profile, user_state_id, is_enabled, is_locked, user_type_id from user where id = #{id}
+        select id,
+               username,
+               nickname,
+               password,
+               user_profile,
+               user_state_id,
+               is_enabled,
+               is_locked,
+               user_type_id
+        from user
+        where id = #{id}
     </select>
+
+
     <update id="changeLockedStatus">
-        update user set is_locked=#{isLocked} where id=#{id}
+        update user
+        set is_locked=#{isLocked}
+        where id = #{id}
     </update>
     <delete id="deleteByIds">
         delete from user where id in

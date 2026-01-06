@@ -1,10 +1,14 @@
 package top.javahai.chatroom.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+
 import top.javahai.chatroom.context.BaseContext;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
@@ -12,6 +16,8 @@ import top.javahai.chatroom.entity.dto.UserLoginDTO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 import top.javahai.chatroom.handler.exception.AccountNotFoundException;
 import top.javahai.chatroom.handler.exception.PasswordErrorException;
+import top.javahai.chatroom.handler.exception.VerifycodeEmptyException;
+import top.javahai.chatroom.handler.exception.VerifycodeErrorException;
 import top.javahai.chatroom.mapper.UserMapper;
 import top.javahai.chatroom.service.UserService;
 
@@ -20,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static top.javahai.chatroom.constant.RedisConstant.VERIFY_CODE_KEY;
 
 /**
  * (User)表服务实现类
@@ -37,6 +45,8 @@ public class UserServiceImpl implements UserService{
     @Autowired
     private SimpMessagingTemplate simpMessagingTemplate;
 
+    @Autowired
+    private StringRedisTemplate redisTemplate;
     /**
      * 获取除了当前用户的所有user表的数据
      *
@@ -90,7 +100,10 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public UserGetVO queryById(Integer id) {
-        return this.userMapper.queryById(id);
+        User user = userMapper.queryById(id);
+        UserGetVO userGetVO = new UserGetVO();
+        BeanUtils.copyProperties(user, userGetVO);
+        return userGetVO;
     }
 
     @Override
@@ -156,6 +169,26 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public User login(UserLoginDTO userLoginDTO) {
+        // 先校验验证码是否正确
+        String verifyKey = userLoginDTO.getVerifyKey();
+        String code = userLoginDTO.getCode();
+        // 判断验证码是否为空
+        if(StringUtils.isBlank(verifyKey) || StringUtils.isBlank(code)){
+            throw new VerifycodeEmptyException("验证码不能为空");
+        }
+        // 从redis中获取验证码
+        String redisKey = VERIFY_CODE_KEY + verifyKey;
+        String redisCode = redisTemplate.opsForValue().get(redisKey);
+        // 若redis中的验证码为空，则说明已过期，则抛出异常
+        if(StringUtils.isBlank(redisCode)){
+            throw new VerifycodeEmptyException("验证码已过期");
+        }
+        if(!redisCode.equalsIgnoreCase(code)){
+            throw new VerifycodeErrorException("验证码错误");
+        }
+        // 验证通过后，立即删除 Redis 中的 Key，防止重复使用
+        redisTemplate.delete(redisKey);
+
         String username = userLoginDTO.getUsername();
         String password = userLoginDTO.getPassword();
         User user = userMapper.getUserByUsername(username);

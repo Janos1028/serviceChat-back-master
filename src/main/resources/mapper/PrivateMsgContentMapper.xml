@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="top.javahai.chatroom.mapper.PrivateMsgContentMapper">
+
+    <resultMap id="BaseResultMap" type="top.javahai.chatroom.entity.PrivateMsgContent">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="from_id" property="fromId" jdbcType="INTEGER"/>
+        <result column="to_id" property="toId" jdbcType="INTEGER"/>
+        <result column="content" property="content" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="message_type_id" property="messageTypeId" jdbcType="INTEGER"/>
+        <result column="conversation_id" property="conversationId" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <resultMap id="HistoryMsgMap" type="top.javahai.chatroom.entity.PrivateMsgContent" extends="BaseResultMap">
+        <result column="fromName" property="fromName" jdbcType="VARCHAR"/>
+        <result column="fromProfile" property="fromProfile" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="top.javahai.chatroom.entity.PrivateMsgContent" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO private_msg_content
+        (from_id, to_id, content, create_time, message_type_id, conversation_id)
+        VALUES
+            (#{fromId}, #{toId}, #{content}, #{createTime}, #{messageTypeId}, #{conversationId})
+    </insert>
+
+    <select id="getHistoryMsg"  resultType="top.javahai.chatroom.entity.PrivateMsgContent">
+        SELECT m.id,
+               m.from_id,
+               m.to_id,
+               m.content,
+               m.create_time,
+               m.message_type_id,
+               m.conversation_id,
+               u.nickname     as fromName,
+               u.user_profile as fromProfile
+        FROM private_msg_content m
+                 LEFT JOIN user u ON m.from_id = u.id
+        WHERE m.conversation_id in (SELECT t.id
+                                    from (SELECT id
+                                          FROM private_chat_conversation
+                                          where (
+                                                    (user_id_1 = #{userId1} AND user_id_2 = #{userId2})
+                                                        OR
+                                                    (user_id_1 = #{userId2} AND user_id_2 = #{userId1}))
+                                          ORDER BY create_time DESC
+                                          limit 5
+                                         ) as t
+        )
+        ORDER BY m.create_time ASC
+    </select>
+
+</mapper>

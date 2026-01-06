@@ -10,8 +10,8 @@ import java.sql.SQLException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-  @ExceptionHandler(BaseException.class)
-  public RespBean handleBusinessException(BaseException e) {
+  @ExceptionHandler(RuntimeException.class)
+  public RespBean handleBusinessException(RuntimeException e) {
     return RespBean.error(e.getMessage());
   }
 
