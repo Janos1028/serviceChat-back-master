@@ -77,7 +77,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         // 3. WS 状态通知
         sendWsStatus(fromId, toId, conversationId, "START");
 
-        return RespBean.ok("会话开启成功", conversationId);
+        return RespBean.ok("会话已开启", conversationId);
     }
 
     @Override
