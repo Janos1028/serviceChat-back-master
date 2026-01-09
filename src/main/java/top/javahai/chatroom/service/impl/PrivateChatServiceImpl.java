@@ -63,7 +63,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             newConv.setIsActive(true);
             conversationMapper.insert(newConv);
 
-            // 【核心修改】存入数据库！Type=4 代表会话开启
+            // 存入数据库！Type=4 代表会话开启
             saveAndPushSystemMessage(fromId, toId, conversationId, 4, "会话已开启");
 
             // 发送打招呼消息 (Type=1)
@@ -108,6 +108,43 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     public Map<Object, Object> getAllActiveSessions(Integer userId) {
         return redisTemplate.opsForHash().entries(SESSION_KEY_PREFIX + userId);
     }
+
+    @Override
+    public List<Integer> getUnreadSenders(Integer userId) {
+        return msgMapper.getUnreadSenders(userId);
+    }
+
+    /**
+     * 更新消息状态为已读
+     * @param fromId
+     * @param toId
+     */
+    @Override
+    public void updateMsgStateToRead(Integer fromId, Integer toId) {
+// 1. 数据库更新：将对方(fromId)发给我(toId)的未读消息改为已读(1)
+        msgMapper.updateMsgStateToRead(fromId, toId);
+
+        // 2. 实时通知发送者：你的消息被读了
+        // 发送者是 fromId，接收者(当前读者)是 toId
+        User sender = userMapper.queryById(fromId);
+        User reader = userMapper.queryById(toId);
+
+        if (sender != null && reader != null) {
+            // 构造回执 payload
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "READ_RECEIPT"); // 消息类型：已读回执
+            payload.put("readerId", toId);       // 谁读了消息
+            payload.put("readerName", reader.getUsername()); // 读者的用户名（用于前端查找会话）
+
+            // 推送到发送者的状态频道：/user/{username}/queue/chat/status
+            simpMessagingTemplate.convertAndSendToUser(
+                    sender.getUsername(),
+                    "/queue/chat/status",
+                    payload
+            );
+        }
+    }
+
     @Override
     public List<PrivateMsgContent> getHistoryMsg(Integer userId1, Integer userId2) {
         return msgMapper.getHistoryMsg(userId1, userId2);
@@ -122,7 +159,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         return conv != null ? conv.getId() : null;
     }
 
-    // --- 辅助方法 ---
+
 
     /**
      * 【核心逻辑】保存并推送系统消息
@@ -188,7 +225,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         greeting.setConversationId(convId);
         greeting.setFromName(fromUser.getNickname());
         greeting.setFromProfile(fromUser.getUserProfile());
-
+        greeting.setState(0);
         msgMapper.insert(greeting);
 
         // --- 构造推送消息 Payload ---

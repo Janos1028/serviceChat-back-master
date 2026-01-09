@@ -20,6 +20,9 @@ public class RespBean {
   public static RespBean ok(Object obj){
     return new RespBean(200,null,obj);
   }
+  public static RespBean ok(){
+    return new RespBean(200,null,null);
+  }
   public static RespBean ok(String msg,Object obj){
     return new RespBean(200,msg,obj);
   }

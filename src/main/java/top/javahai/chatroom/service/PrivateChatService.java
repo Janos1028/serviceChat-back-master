@@ -12,6 +12,10 @@ public interface PrivateChatService {
     void saveMsg(PrivateMsgContent msg);
     String getActiveConversationId(Integer userId1, Integer userId2);
 
-    // 【新增】获取某用户的所有活跃会话
+    //获取某用户的所有活跃会话
     Map<Object, Object> getAllActiveSessions(Integer userId);
+    // 获取某用户所有未读会话
+    List<Integer> getUnreadSenders(Integer userId);
+
+    void updateMsgStateToRead(Integer fromId, Integer toId);
 }

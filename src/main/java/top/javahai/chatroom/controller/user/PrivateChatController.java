@@ -72,4 +72,23 @@ public class PrivateChatController {
         Map<Object, Object> sessions = privateChatService.getAllActiveSessions(currentUser.getId());
         return RespBean.ok(sessions);
     }
+
+    /**
+     * 获取离线期间未读会话
+     * @return
+     */
+    @GetMapping("/getUnreadSenders")
+    public RespBean getUnreadSenders() {
+        User currentUser = (User) BaseContext.getCurrent();
+        List<Integer> unreadSenders = privateChatService.getUnreadSenders(currentUser.getId());
+        return RespBean.ok(unreadSenders);
+    }
+
+    @PostMapping("/updateMsgStateToRead")
+    public RespBean updateMsgStateToRead(@RequestParam Integer fromId) {
+        User currentUser = (User) BaseContext.getCurrent();
+        // 将 fromId 发给 currentUserId 的所有消息状态置为 1
+        privateChatService.updateMsgStateToRead(fromId, currentUser.getId());
+        return RespBean.ok();
+    }
 }

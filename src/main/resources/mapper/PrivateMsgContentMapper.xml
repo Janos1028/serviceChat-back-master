@@ -23,6 +23,13 @@
         VALUES
             (#{fromId}, #{toId}, #{content}, #{createTime}, #{messageTypeId}, #{conversationId})
     </insert>
+    <update id="updateMsgStateToRead">
+        UPDATE private_msg_content
+        SET state = 1
+        WHERE from_id = #{fromId}
+          AND to_id = #{toId}
+          AND state = 0
+    </update>
 
     <select id="getHistoryMsg"  resultType="top.javahai.chatroom.entity.PrivateMsgContent">
         SELECT m.id,
@@ -48,6 +55,12 @@
                                          ) as t
         )
         ORDER BY m.create_time ASC
+    </select>
+    <select id="getUnreadSenders" resultType="java.lang.Integer">
+        SELECT DISTINCT from_id
+        FROM private_msg_content
+        WHERE to_id = #{userId}
+          AND state = 0
     </select>
 
 </mapper>
