@@ -16,5 +16,6 @@ public class UserGetVO {
     private String userProfile;
     private Integer userStateId;
     private Integer userTypeId;
+    private String supportServiceName;
     private Date lastMessageTime;
 }

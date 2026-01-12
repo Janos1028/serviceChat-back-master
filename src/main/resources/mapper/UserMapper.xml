@@ -224,6 +224,28 @@
         from user
         where id = #{id}
     </select>
+    <select id="getRecentConversation" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.user_profile AS userProfile,
+            u.user_state_id AS userStateId,
+            u.user_type_id AS userTypeId,
+            MAX(m.create_time) AS lastMessageTime
+        FROM user u
+                 INNER JOIN private_msg_content m
+                            ON (u.id = m.from_id OR u.id = m.to_id)
+        WHERE
+          -- 1. 必须涉及当前支撑人员
+            (m.from_id = #{currentUserId} OR m.to_id = #{currentUserId})
+          -- 2. 限制为最近7天
+          AND m.create_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+          -- 3. 排除自己
+          AND u.id != #{currentUserId}
+        GROUP BY u.id
+        ORDER BY lastMessageTime DESC
+    </select>
 
 
     <update id="changeLockedStatus">

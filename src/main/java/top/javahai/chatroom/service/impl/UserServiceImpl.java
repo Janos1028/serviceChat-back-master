@@ -212,4 +212,9 @@ public class UserServiceImpl implements UserService{
         return userMapper.selectUser(id);
 
     }
+
+    @Override
+    public List<UserGetVO> getRecentConversation(Integer currentId) {
+        return userMapper.getRecentConversation(currentId);
+    }
 }

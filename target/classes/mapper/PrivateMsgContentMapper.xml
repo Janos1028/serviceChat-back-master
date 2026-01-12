@@ -23,6 +23,13 @@
         VALUES
             (#{fromId}, #{toId}, #{content}, #{createTime}, #{messageTypeId}, #{conversationId})
     </insert>
+    <update id="updateMsgStateToRead">
+        UPDATE private_msg_content
+        SET state = 1
+        WHERE from_id = #{fromId}
+          AND to_id = #{toId}
+          AND state = 0
+    </update>
 
     <select id="getHistoryMsg"  resultType="top.javahai.chatroom.entity.PrivateMsgContent">
         SELECT m.id,
@@ -36,18 +43,21 @@
                u.user_profile as fromProfile
         FROM private_msg_content m
                  LEFT JOIN user u ON m.from_id = u.id
-        WHERE m.conversation_id in (SELECT t.id
-                                    from (SELECT id
-                                          FROM private_chat_conversation
-                                          where (
-                                                    (user_id_1 = #{userId1} AND user_id_2 = #{userId2})
-                                                        OR
-                                                    (user_id_1 = #{userId2} AND user_id_2 = #{userId1}))
-                                          ORDER BY create_time DESC
-                                          limit 5
-                                         ) as t
-        )
+        WHERE
+            (
+                (m.from_id = #{userId1} AND m.to_id = #{userId2})
+                    OR
+                (m.from_id = #{userId2} AND m.to_id = #{userId1})
+                )
+          -- 只能查最近3天
+          AND m.create_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
         ORDER BY m.create_time ASC
+    </select>
+    <select id="getUnreadSenders" resultType="java.lang.Integer">
+        SELECT DISTINCT from_id
+        FROM private_msg_content
+        WHERE to_id = #{userId}
+          AND state = 0
     </select>
 
 </mapper>

@@ -44,7 +44,7 @@ public class User {
     private Boolean isLocked;
 
     private Integer userTypeId;
-
+    private Integer support_service_id;
     public void setEnabled(Boolean enabled) {
         isEnabled = enabled;
     }

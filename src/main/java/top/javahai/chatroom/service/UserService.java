@@ -99,4 +99,6 @@ public interface UserService {
     User login(UserLoginDTO userLoginDTO);
 
     User selectUser(Integer id);
+
+    List<UserGetVO> getRecentConversation(Integer id);
 }

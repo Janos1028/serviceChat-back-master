@@ -101,4 +101,5 @@ public interface UserMapper {
     User selectUser(Integer id);
 
 
+    List<UserGetVO> getRecentConversation(Integer currentId);
 }
