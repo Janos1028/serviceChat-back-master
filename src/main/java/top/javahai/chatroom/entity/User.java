@@ -4,10 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * @author makejava
- * @since 2020-06-16 12:08:01
- */
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -44,7 +42,8 @@ public class User {
     private Boolean isLocked;
 
     private Integer userTypeId;
-    private Integer support_service_id;
+    private Integer serviceDomainId;
+
     public void setEnabled(Boolean enabled) {
         isEnabled = enabled;
     }

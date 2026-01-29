@@ -6,4 +6,6 @@ public class JwtClaimsConstant {
     public static final String USERNAME = "username";
     public static final String NICKNAME = "nickname";
     public static final String USERTYPEID = "userTypeId";
+    public static final String USER_PROFILE = "userProfile";
+    public static final String SERVICE_DOMAIN_ID = "serviceDomainId";
 }

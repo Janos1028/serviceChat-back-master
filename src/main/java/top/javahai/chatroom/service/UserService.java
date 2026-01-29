@@ -1,8 +1,11 @@
 package top.javahai.chatroom.service;
 
 import top.javahai.chatroom.entity.RespPageBean;
+import top.javahai.chatroom.entity.ServiceDomain;
+import top.javahai.chatroom.entity.SupportService;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 
 import java.util.List;
@@ -27,13 +30,13 @@ public interface UserService {
      * 设置用户当前状态为在线
      * @param id 用户id
      */
-    public void setUserStateToOn(Integer id);
+    void setUserStateToOn(Integer id);
 
     /**
      * 设置用户当前状态为离线
      * @param id
      */
-    public void setUserStateToLeave(Integer id);
+    void setUserStateToLeave(Integer id);
 
     /**
      * 通过ID查询单条数据
@@ -98,7 +101,15 @@ public interface UserService {
 
     User login(UserLoginDTO userLoginDTO);
 
-    User selectUser(Integer id);
+    UserCardVO selectUser(Integer id);
 
-    List<UserGetVO> getRecentConversation(Integer id);
+    List<UserGetVO> getRecentConversation(Integer serviceDomainId, Integer currentUserId);
+
+    List<SupportService> getSupportServiceCategories(Integer domainId);
+
+    List<ServiceDomain> getAllServiceDomains();
+
+    void logout();
+
+    void changeUserState(Integer stateId);
 }

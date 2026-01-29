@@ -13,9 +13,9 @@
 
     <insert id="insert" parameterType="top.javahai.chatroom.entity.PrivateChatConversation">
         INSERT INTO private_chat_conversation
-            (id, user_id_1, user_id_2, create_time, is_active)
+            (id, user_id_1, user_id_2, create_time, is_active, service_domain_id, service_id, service_name)
         VALUES
-            (#{id}, #{userId1}, #{userId2}, #{createTime}, #{isActive})
+            (#{id}, #{userId1}, #{userId2}, #{createTime}, #{isActive}, #{serviceDomainId},#{serviceId},#{serviceName})
     </insert>
 
     <update id="update" parameterType="top.javahai.chatroom.entity.PrivateChatConversation">
@@ -25,19 +25,66 @@
             is_active = #{isActive}
         WHERE id = #{id}
     </update>
+    <update id="updateScore">
+        UPDATE private_chat_conversation
+        SET score = #{score}
+        WHERE id = #{conversationId}
+    </update>
 
     <select id="queryById" resultMap="BaseResultMap">
-        SELECT * FROM private_chat_conversation WHERE id = #{id}
+        SELECT id,
+               user_id_1,
+               user_id_2,
+               create_time,
+               end_time,
+               is_active,
+               service_domain_id,
+               service_id,
+               service_name,
+               score
+        FROM private_chat_conversation
+        WHERE id = #{id}
     </select>
 
     <select id="getActiveConversation" resultMap="BaseResultMap">
-        SELECT * FROM private_chat_conversation
-        WHERE
-            ((user_id_1 = #{userId1} AND user_id_2 = #{userId2})
-                OR
-             (user_id_1 = #{userId2} AND user_id_2 = #{userId1}))
+        SELECT id,
+               user_id_1,
+               user_id_2,
+               create_time,
+               end_time,
+               is_active,
+               service_domain_id,
+               service_id,
+               service_name,
+               score
+        FROM private_chat_conversation
+        WHERE ((user_id_1 = #{userId1} AND user_id_2 = #{userId2})
+            OR
+               (user_id_1 = #{userId2} AND user_id_2 = #{userId1}))
           AND is_active = 1
         LIMIT 1
+    </select>
+    <select id="getScoreById" resultType="short">
+        SELECT score FROM private_chat_conversation WHERE id = #{id}
+    </select>
+    <select id="selectEndedConversationsForUser"
+            resultType="top.javahai.chatroom.entity.PrivateChatConversation">
+        SELECT id,
+               user_id_1,
+               user_id_2,
+               create_time,
+               end_time,
+               is_active,
+               service_domain_id,
+               service_id,
+               service_name,
+               score
+        FROM private_chat_conversation
+        WHERE ((user_id_1 = #{userId} OR user_id_2 = #{userId})
+            AND
+               is_active IN (0, 2))
+          AND create_time >= #{startDate}
+          AND service_domain_id = #{serviceDomainId}
     </select>
 
 </mapper>

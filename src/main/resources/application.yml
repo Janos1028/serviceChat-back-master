@@ -45,8 +45,8 @@ aliyun:
 chatroom:
   jwt:
     admin-secret-key: fsuit_admin_secret
-    admin-ttl: 7200000
+    admin-ttl: 604800000
     admin-token-name: Authorization
     user-secret-key: fsuit_user_secret
-    user-ttl: 7200000
+    user-ttl: 604800000
     user-token-name: Authorization

@@ -1,5 +1,6 @@
 package top.javahai.chatroom.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -10,14 +11,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import top.javahai.chatroom.context.BaseContext;
-import top.javahai.chatroom.entity.RespPageBean;
-import top.javahai.chatroom.entity.User;
+import top.javahai.chatroom.entity.*;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
-import top.javahai.chatroom.handler.exception.AccountNotFoundException;
-import top.javahai.chatroom.handler.exception.PasswordErrorException;
-import top.javahai.chatroom.handler.exception.VerifycodeEmptyException;
-import top.javahai.chatroom.handler.exception.VerifycodeErrorException;
+import top.javahai.chatroom.handler.exception.*;
 import top.javahai.chatroom.mapper.UserMapper;
 import top.javahai.chatroom.service.UserService;
 
@@ -26,8 +24,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import static top.javahai.chatroom.constant.RedisConstant.VERIFY_CODE_KEY;
+import static top.javahai.chatroom.constant.RedisConstant.*;
 
 /**
  * (User)表服务实现类
@@ -47,6 +46,8 @@ public class UserServiceImpl implements UserService{
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+
     /**
      * 获取除了当前用户的所有user表的数据
      *
@@ -203,18 +204,69 @@ public class UserServiceImpl implements UserService{
         if (!inputPass.equals(user.getPassword())) {
             throw new PasswordErrorException("密码错误");
         }
-        userMapper.setUserStateToOn(user.getId());
+        this.setUserStateToOn(user.getId());
+        if (redisTemplate.opsForValue().get(USER_ONLINE+user.getId())==null){
+            UserInfo userInfo = new UserInfo();
+            BeanUtils.copyProperties(user, userInfo);
+            String userJson = JSON.toJSONString(userInfo);
+            redisTemplate.opsForValue().set(USER_ONLINE+user.getId(),userJson, 10 * 60 * 60, TimeUnit.SECONDS);
+        }
+
         return user;
     }
 
     @Override
-    public User selectUser(Integer id) {
+    public UserCardVO selectUser(Integer id) {
         return userMapper.selectUser(id);
 
     }
 
     @Override
-    public List<UserGetVO> getRecentConversation(Integer currentId) {
-        return userMapper.getRecentConversation(currentId);
+    public List<UserGetVO> getRecentConversation(Integer serviceDomainId, Integer currentUserId) {
+        return userMapper.getRecentConversation(serviceDomainId, currentUserId);
+    }
+
+    @Override
+    public List<SupportService> getSupportServiceCategories(Integer domainId) {
+        return userMapper.getSupportServiceCategories(domainId);
+    }
+
+    @Override
+    public List<ServiceDomain> getAllServiceDomains() {
+        String allServiceDomains = redisTemplate.opsForValue().get(ALL_SERVICE_DOMAINS_KEY);
+        if (allServiceDomains != null) {
+            return JSON.parseArray(allServiceDomains, ServiceDomain.class);
+        }else {
+            List<ServiceDomain> serviceDomains = userMapper.getAllServiceDomains();
+            String json = JSON.toJSONString(serviceDomains);
+            redisTemplate.opsForValue().set(ALL_SERVICE_DOMAINS_KEY, json, 2, TimeUnit.HOURS);
+            return serviceDomains;
+        }
+    }
+
+    @Override
+    public void logout() {
+        // 1. 从 BaseContext 获取当前登录用户（由 JwtTokenUserInterceptor 拦截器注入）
+        User user = (User) BaseContext.getCurrent();
+
+        if (user != null) {
+            // 2. 更新数据库状态为 [离线] 并广播 WebSocket 消息
+            // (复用你已有的 setUserStateToLeave 方法)
+            this.setUserStateToLeave(user.getId());
+
+            // 3. 立即清除 Redis 中的用户信息缓存，防止数据残留
+            // 这里的 USER_ONLINE 是常量，对应 key 前缀
+            redisTemplate.delete(USER_ONLINE + user.getId());
+
+        }
+    }
+
+    @Override
+    public void changeUserState(Integer stateId) {
+        User currentUser = (User) BaseContext.getCurrent();
+        if (currentUser.getUserTypeId() == 0){
+            throw new UserChangeStateException("当前用户无法主动切换状态！");
+        }
+        this.userMapper.changeUserState(currentUser.getId(), stateId);
     }
 }

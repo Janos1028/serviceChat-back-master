@@ -1,17 +1,15 @@
 package top.javahai.chatroom.mapper;
 
+import top.javahai.chatroom.entity.ServiceDomain;
+import top.javahai.chatroom.entity.SupportService;
 import top.javahai.chatroom.entity.User;
 import org.apache.ibatis.annotations.Param;
+import top.javahai.chatroom.entity.UserInfo;
+import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 
 import java.util.List;
 
-/**
- * (User)表数据库访问层
- *
- * @author makejava
- * @since 2020-06-16 12:06:29
- */
 public interface UserMapper {
 
     /**
@@ -98,8 +96,39 @@ public interface UserMapper {
 
     List<UserGetVO> ConstantGetUsersWithoutCurrentUser(Integer id);
 
-    User selectUser(Integer id);
+    UserCardVO selectUser(Integer id);
 
+    List<UserGetVO> getRecentConversation(Integer serviceDomainId, Integer currentUserId);
 
-    List<UserGetVO> getRecentConversation(Integer currentId);
+    /**
+     * 获取所有唯一的支撑服务分类
+     * @return
+     */
+    List<SupportService> getSupportServiceCategories(Integer domainId);
+
+    /**
+     * 获取指定服务下的所有在线的客服
+     * @param serviceId
+     * @return
+     */
+    List<Integer> getOnlineSupporterByServiceId(Integer domainId, @Param("serviceId") Integer serviceId);
+
+    /**
+     * 获取所有服务域（大类）
+     */
+    List<ServiceDomain> getAllServiceDomains();
+
+    /**
+     * 根据服务域ID获取该域下的支撑服务
+     * @param domainId 服务域ID
+     */
+    List<SupportService> getSupportServicesByDomainId(@Param("domainId") Integer domainId);
+
+    UserInfo getUserInfoById(Integer id);
+
+    String getServiceNameById(Integer serviceId);
+
+    void changeUserState(Integer id, Integer stateId);
+
+    int isHasActiveConversationInDomain(Integer domainId, Integer userId);
 }

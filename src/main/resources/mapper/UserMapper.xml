@@ -23,7 +23,8 @@
                user_state_id,
                is_enabled,
                is_locked,
-               user_type_id
+               user_type_id,
+               service_domain_id
         from user
         where username = #{username}
     </select>
@@ -158,7 +159,7 @@
     <update id="setUserStateToOn">
         update user
         set user_state_id=1
-        where id = #{id}
+        where id = #{id} AND user_state_id=2
     </update>
     <update id="setUserStateToLeave">
         update user
@@ -211,15 +212,11 @@
             ) DESC,
             u.user_state_id ASC
     </select>
-    <select id="selectUser" resultType="top.javahai.chatroom.entity.User">
+    <select id="selectUser" resultType="top.javahai.chatroom.entity.vo.UserCardVO">
         select id,
-               username,
                nickname,
-               password,
                user_profile,
                user_state_id,
-               is_enabled,
-               is_locked,
                user_type_id
         from user
         where id = #{id}
@@ -236,15 +233,65 @@
         FROM user u
                  INNER JOIN private_msg_content m
                             ON (u.id = m.from_id OR u.id = m.to_id)
+                 INNER JOIN private_chat_conversation c ON m.conversation_id = c.id
         WHERE
-          -- 1. 必须涉及当前支撑人员
-            (m.from_id = #{currentUserId} OR m.to_id = #{currentUserId})
-          -- 2. 限制为最近7天
+          -- 1. 基础过滤：排除自己，限制时间
+            u.id != #{currentUserId}
           AND m.create_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-          -- 3. 排除自己
-          AND u.id != #{currentUserId}
+
+          -- 2. 限制为当前服务域
+          AND c.service_domain_id = #{serviceDomainId}
+
+          -- 3. 核心修正：可见性规则 (使用括号包裹 OR 条件)
+          AND (
+            -- 情况 A: 我参与的会话 (无论是进行中还是已结束都能看)
+            (c.user_id_1 = #{currentUserId} OR c.user_id_2 = #{currentUserId})
+                OR
+                -- 情况 B: 别人的会话 (必须是已结束的)
+            (c.is_active = 0)
+            )
+          AND u.user_type_id = 0
         GROUP BY u.id
         ORDER BY lastMessageTime DESC
+    </select>
+    <select id="getSupportServiceCategories" resultType="top.javahai.chatroom.entity.SupportService">
+        SELECT id, name
+        FROM support_services
+        WHERE service_domain_id = #{domainId}
+    </select>
+    <select id="getOnlineSupporterByServiceId" resultType="integer">
+        SELECT
+            u.id
+        FROM user u
+                 INNER JOIN user_support_services uss ON u.id = uss.user_id
+        WHERE u.user_type_id = 1
+          AND uss.service_id = #{serviceId}
+          AND u.user_state_id = 1
+          AND u.is_locked = 0
+          AND u.service_domain_id = #{domainId}
+    </select>
+    <select id="getAllServiceDomains" resultType="top.javahai.chatroom.entity.ServiceDomain">
+        SELECT id, name FROM service_domain
+    </select>
+    <select id="getSupportServicesByDomainId" resultType="top.javahai.chatroom.entity.SupportService">
+        SELECT id, name
+        FROM support_services
+        WHERE service_domain_id = #{domainId}
+    </select>
+    <select id="getUserInfoById" resultType="top.javahai.chatroom.entity.UserInfo">
+        SELECT id, username, nickname, user_profile, user_type_id, service_domain_id
+        FROM user
+        where id = #{id}
+    </select>
+    <select id="getServiceNameById" resultType="string">
+        SELECT name FROM support_services WHERE id = #{serviceId}
+    </select>
+    <select id="isHasActiveConversationInDomain" resultType="java.lang.Integer">
+        SELECT count(*) FROM private_chat_conversation
+        WHERE
+          (user_id_1 = #{userId} OR user_id_2 = #{userId})
+          AND is_active = 1
+          AND service_domain_id = #{domainId}
     </select>
 
 
@@ -252,6 +299,9 @@
         update user
         set is_locked=#{isLocked}
         where id = #{id}
+    </update>
+    <update id="changeUserState">
+        UPDATE user set user_state_id=#{stateId} where id=#{id}
     </update>
     <delete id="deleteByIds">
         delete from user where id in

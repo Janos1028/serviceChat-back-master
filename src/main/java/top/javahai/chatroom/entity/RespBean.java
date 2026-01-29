@@ -1,9 +1,6 @@
 package top.javahai.chatroom.entity;
 
-/**
- * @author Hai
- * @date 2020/4/19 - 23:23
- */
+
 //JSON返回值的实体类
 public class RespBean {
   private Integer status;//状态码

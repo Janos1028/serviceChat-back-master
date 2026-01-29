@@ -3,6 +3,9 @@ package top.javahai.chatroom.mapper;
 import org.apache.ibatis.annotations.*;
 import top.javahai.chatroom.entity.PrivateChatConversation;
 
+import java.util.Date;
+import java.util.List;
+
 @Mapper
 public interface PrivateChatConversationMapper {
 
@@ -19,4 +22,10 @@ public interface PrivateChatConversationMapper {
 
     // 查询两人当前是否还有正在进行的会话
     PrivateChatConversation getActiveConversation(@Param("userId1") Integer userId1, @Param("userId2") Integer userId2);
+
+    void updateScore(String conversationId, int score);
+
+    Short getScoreById(String conversationId);
+
+    List<PrivateChatConversation> selectEndedConversationsForUser(Integer userId, Integer serviceDomainId, Date startDate);
 }

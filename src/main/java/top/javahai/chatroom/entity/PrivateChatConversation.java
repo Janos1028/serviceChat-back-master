@@ -21,6 +21,9 @@ public class PrivateChatConversation {
     private Date createTime;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date endTime;
-    private Boolean isActive; // true: 进行中, false: 已结束
-
+    private Short isActive; // true: 进行中, false: 已结束
+    private Integer serviceDomainId;
+    private Integer serviceId;
+    private String serviceName;
+    private Short score;
 }

@@ -19,9 +19,9 @@
 
     <insert id="insert" parameterType="top.javahai.chatroom.entity.PrivateMsgContent" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO private_msg_content
-        (from_id, to_id, content, create_time, message_type_id, conversation_id)
+        (from_id, to_id, content, create_time, message_type_id, conversation_id,service_domain_id, state)
         VALUES
-            (#{fromId}, #{toId}, #{content}, #{createTime}, #{messageTypeId}, #{conversationId})
+            (#{fromId}, #{toId}, #{content}, #{createTime}, #{messageTypeId}, #{conversationId},#{serviceDomainId},#{state})
     </insert>
     <update id="updateMsgStateToRead">
         UPDATE private_msg_content
@@ -30,8 +30,20 @@
           AND to_id = #{toId}
           AND state = 0
     </update>
+    <update id="updateStateByDomain">
+        UPDATE private_msg_content
+        SET state = 1
+        WHERE service_domain_id = #{domainId}
+          AND to_id = #{toId}
+          AND state = 0
+    </update>
+    <update id="updateMessageState">
+        UPDATE private_msg_content
+        SET state = #{state}
+        WHERE id = #{messageId}
+    </update>
 
-    <select id="getHistoryMsg"  resultType="top.javahai.chatroom.entity.PrivateMsgContent">
+    <select id="supporterGetHistoryMsg" resultType="top.javahai.chatroom.entity.PrivateMsgContent">
         SELECT m.id,
                m.from_id,
                m.to_id,
@@ -39,25 +51,94 @@
                m.create_time,
                m.message_type_id,
                m.conversation_id,
+               m.state,
                u.nickname     as fromName,
                u.user_profile as fromProfile
         FROM private_msg_content m
                  LEFT JOIN user u ON m.from_id = u.id
+                 LEFT JOIN private_chat_conversation c ON m.conversation_id = c.id
         WHERE
-            (
-                (m.from_id = #{userId1} AND m.to_id = #{userId2})
-                    OR
-                (m.from_id = #{userId2} AND m.to_id = #{userId1})
-                )
+            (c.user_id_1 = #{userId} OR c.user_id_2 = #{userId})
           -- 只能查最近3天
+          AND m.service_domain_id = #{serviceDomainId}
+          AND (
+            -- A. 只要是已结束的，谁的都能看
+            c.is_active = 0
+                OR
+                -- B. 只要是我参与的，不管结束没结束（进行中），都能看
+            (c.user_id_1 = #{currentId} OR c.user_id_2 = #{currentId})
+            )
+          AND (
+            -- A. 正常聊天消息：发送者 != 接收者 (这就自然排除了“用户的自发系统消息”)
+            m.from_id != m.to_id
+                OR
+                -- B. 特殊豁免：如果是“我(当前客服)”自己发给自己的系统消息，我要看！
+            (m.from_id = #{currentId} AND m.to_id = #{currentId})
+            )
           AND m.create_time >= DATE_SUB(NOW(), INTERVAL 3 DAY)
-        ORDER BY m.create_time ASC
+        ORDER BY m.create_time DESC, m.id DESC
     </select>
     <select id="getUnreadSenders" resultType="java.lang.Integer">
         SELECT DISTINCT from_id
         FROM private_msg_content
         WHERE to_id = #{userId}
           AND state = 0
+    </select>
+    <select id="getHistoryMsg" resultType="top.javahai.chatroom.entity.vo.UserPrivateMsgContentVO">
+        SELECT m.id,
+               m.from_id,
+               m.to_id,
+               m.content,
+               m.create_time,
+               m.message_type_id,
+               m.conversation_id,
+               m.state,
+               CASE
+                   WHEN m.message_type_id = 6 THEN c.score
+               END as score
+        FROM private_msg_content m
+                 LEFT JOIN user u_from ON m.from_id = u_from.id
+                 LEFT JOIN user u_to ON m.to_id = u_to.id
+                 LEFT JOIN private_chat_conversation c ON m.conversation_id = c.id
+        WHERE (
+            (
+                -- 情况1: 我(用户)发给客服 -> 接收者(u_to)必须是该域的客服
+                (m.from_id = #{userId} AND u_to.service_domain_id = #{serviceDomainId} AND u_to.user_type_id = 1)
+                )
+                OR
+            (
+                -- 情况2: 客服发给我(用户) -> 发送者(u_from)必须是该域的客服
+                (m.to_id = #{userId} AND u_from.service_domain_id = #{serviceDomainId} AND u_from.user_type_id = 1)
+                )
+                OR
+            (
+                -- 【情况3】: 我自己发给自己的系统消息
+                -- 这里的 m.service_domain_id 是消息表自带的，绝对有值，不会因为用户身份而为空
+                (m.from_id = #{userId} AND m.to_id = #{userId}  AND m.service_domain_id = #{serviceDomainId})
+                )
+            )
+          AND m.create_time >= #{startDate}
+        ORDER BY m.create_time DESC, m.id DESC
+    </select>
+    <select id="getUnreadStaffIdsByDomain" resultType="java.lang.Integer">
+        SELECT DISTINCT from_id
+        FROM private_msg_content
+        WHERE to_id = #{currentUserId}
+          AND service_domain_id = #{domainId}
+          AND state = 0
+    </select>
+    <select id="selectById" resultType="top.javahai.chatroom.entity.PrivateMsgContent">
+        SELECT ID,
+               FROM_ID,
+               TO_ID,
+               CONTENT,
+               CREATE_TIME,
+               MESSAGE_TYPE_ID,
+               CONVERSATION_ID,
+               STATE,
+               SERVICE_DOMAIN_ID
+        FROM private_msg_content
+        WHERE id = #{id}
     </select>
 
 </mapper>

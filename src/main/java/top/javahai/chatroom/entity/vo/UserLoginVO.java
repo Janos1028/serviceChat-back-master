@@ -15,5 +15,5 @@ public class UserLoginVO implements Serializable {
     private Integer userTypeId;
     private String userProfile;
     private String token;
-
+    private Integer serviceDomainId;
 }

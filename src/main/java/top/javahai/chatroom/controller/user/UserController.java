@@ -5,11 +5,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import top.javahai.chatroom.config.JwtProperties;
 import top.javahai.chatroom.constant.JwtClaimsConstant;
+import top.javahai.chatroom.context.BaseContext;
 import top.javahai.chatroom.entity.GroupMsgContent;
 import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserLoginVO;
 import top.javahai.chatroom.service.UserService;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * (User)表控制层
- *
- * @author makejava
- * @since 2020-06-16 11:37:09
- */
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -50,6 +46,10 @@ public class UserController {
         claims.put(JwtClaimsConstant.USERNAME, user.getUsername());
         claims.put(JwtClaimsConstant.NICKNAME, user.getNickname());
         claims.put(JwtClaimsConstant.USERTYPEID, user.getUserTypeId());
+        if (user.getUserTypeId() == 1){
+            claims.put(JwtClaimsConstant.SERVICE_DOMAIN_ID, user.getServiceDomainId());
+        }
+
 
         String token = JwtUtil.createJWT(
                 jwtProperties.getUserSecretKey(),
@@ -63,10 +63,21 @@ public class UserController {
                 user.getNickname(),
                 user.getUserTypeId(),
                 user.getUserProfile(),
-                token
+                token,
+                user.getServiceDomainId()
         );
 
         return RespBean.ok("登录成功", userLoginVO);
+    }
+
+    /**
+     * 退出登录
+     * @return
+     */
+    @GetMapping("/logout")
+    public RespBean logout() {
+        userService.logout();
+        return RespBean.ok("退出登录成功");
     }
 
     /**
@@ -120,12 +131,13 @@ public class UserController {
     /**
      * 通过主键查询单条数据
      *
-     * @param id 主键
      * @return 单条数据
      */
-    @GetMapping("/selectOne")
-    public User selectOne(Integer id) {
-        return userService.selectUser(id);
+    @GetMapping("/getCard")
+    public RespBean getCard() {
+        User current = (User) BaseContext.getCurrent();
+        UserCardVO userCardVO = userService.selectUser(current.getId());
+        return RespBean.ok(userCardVO);
     }
 
     /**
@@ -143,4 +155,17 @@ public class UserController {
         log.info("getAllUserByPage: page={},size={},keyword={},isLocked={}",page,size,keyword,isLocked);
         return userService.getAllUserByPage(page,size,keyword,isLocked);
     }
+
+    /**
+     * 修改用户状态
+     * @param stateId
+     * @return
+     */
+    @PostMapping("/supporter/changeUserState")
+    public RespBean changeUserState(Integer stateId){
+        userService.changeUserState(stateId);
+        return RespBean.ok();
+    }
+
+
 }

@@ -26,8 +26,10 @@ public class PrivateMsgContent implements Serializable {
     private Integer messageTypeId; // 消息类型
     private String conversationId; // 关联的会话ID
     private Integer state; // 消息状态，0:未读，1:已读
-
+    private Integer serviceDomainId;
+    private String serviceName;
     // 以下字段用于前端显示，数据库中无此字段
     private String fromName;
     private String fromProfile;
+
 }

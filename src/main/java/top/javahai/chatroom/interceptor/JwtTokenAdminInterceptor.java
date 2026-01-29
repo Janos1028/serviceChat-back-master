@@ -50,7 +50,7 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
             user.setId(Integer.valueOf(claims.get(JwtClaimsConstant.ADMIN_ID).toString()));
             user.setUsername(claims.get(JwtClaimsConstant.USERNAME).toString());
             user.setNickname(claims.get(JwtClaimsConstant.NICKNAME).toString());
-
+            user.setServiceDomainId(Integer.valueOf(claims.get(JwtClaimsConstant.SERVICE_DOMAIN_ID).toString()));
             // 存入 ThreadLocal
             BaseContext.setCurrent(user);
             return true;

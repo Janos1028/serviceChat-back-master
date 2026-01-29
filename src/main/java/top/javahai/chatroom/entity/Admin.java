@@ -2,10 +2,6 @@ package top.javahai.chatroom.entity;
 
 import java.io.Serializable;
 
-/**
- * @author makejava
- * @since 2020-06-16 11:35:56
- */
 public class Admin implements Serializable {
     private static final long serialVersionUID = -75235725571250857L;
 
