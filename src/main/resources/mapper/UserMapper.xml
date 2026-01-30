@@ -293,6 +293,10 @@
           AND is_active = 1
           AND service_domain_id = #{domainId}
     </select>
+    <select id="getDomainById" resultType="string">
+        SELECT name FROM service_domain
+        WHERE id = #{domainId}
+    </select>
 
 
     <update id="changeLockedStatus">

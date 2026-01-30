@@ -131,4 +131,10 @@ public interface UserMapper {
     void changeUserState(Integer id, Integer stateId);
 
     int isHasActiveConversationInDomain(Integer domainId, Integer userId);
+
+    /**
+     * 根据服务域ID获取服务域
+     * @param domainId 服务域ID
+     */
+    String getDomainById(Integer domainId);
 }

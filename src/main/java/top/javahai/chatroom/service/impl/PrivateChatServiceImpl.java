@@ -465,12 +465,12 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     }
 
     private void broadcastConvConfirm(String conversationId, Integer messageId, PrivateChatConversation conv, Integer state) {
-        // 1. 【核心新增】用户反馈未解决，必须移除自动结单定时器
+
         String key = AUTO_CLOSE_KEY_PREFIX + conversationId + ":" + messageId;
         stringRedisTemplate.delete(key);
         log.info("【自动结单】用户点击未解决，移除定时器 Key={}", key);
 
-        // 2. 更新消息状态为 4 (未解决) 并广播
+
         msgMapper.updateMessageState(messageId, state);
         PrivateMsgContent targetMsg = new PrivateMsgContent();
         targetMsg.setId(messageId);
@@ -653,7 +653,6 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msgForUser.put("to", user.getUsername());
         // 必须保留原始发送者ID等信息，防止前端逻辑出错
         msgForUser.put("fromId", staff.getId());
-
         simpMessagingTemplate.convertAndSendToUser(
                 String.valueOf(user.getId()), "/queue/chat", msgForUser
         );
@@ -663,6 +662,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msgForStaff.put("from", user.getUsername()); // 设为用户，定位到正确的会话
         msgForStaff.put("fromId", user.getId());     // 设为用户ID
         msgForStaff.put("to", staff.getUsername());
+        msgForStaff.put("userNickName", user.getNickname());
         // 客服端需要知道这条消息当初是“谁”发的，这里保持原样即可，前端只更新 state
         simpMessagingTemplate.convertAndSendToUser(
                 String.valueOf(staff.getId()), "/queue/chat", msgForStaff
