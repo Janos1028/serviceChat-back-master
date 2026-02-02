@@ -25,7 +25,7 @@
   - 阿里云 OSS (aliyun-sdk-oss)
   - FastDFS (fastdfs-client-java)
 - **配置加密**: Jasypt (jasypt-spring-boot-starter)
-- **工具库**: Apache Commons Lang3, FastJson
+- **工具库**: Apache Commons Lang3
 - **Emoji 处理**: java-emoji-converter
 - **邮件服务**: Spring Boot Mail
 
