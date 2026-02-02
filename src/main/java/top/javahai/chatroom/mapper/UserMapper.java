@@ -5,6 +5,7 @@ import top.javahai.chatroom.entity.SupportService;
 import top.javahai.chatroom.entity.User;
 import org.apache.ibatis.annotations.Param;
 import top.javahai.chatroom.entity.UserInfo;
+import top.javahai.chatroom.entity.dto.UserRegisterDTO;
 import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 
@@ -20,13 +21,6 @@ public interface UserMapper {
     User getUserByUsername(String username);
 
 
-    /**
-     * 获取除当前用户的所有用户
-     *
-     * @param id
-     * @return
-     */
-    List<UserGetVO> getUsersWithoutCurrentUser(Integer id);
 
     /**
      * 通过ID查询单条数据
@@ -55,12 +49,11 @@ public interface UserMapper {
     List<User> queryAll(User user);
 
     /**
-     * 新增数据
+     * 用户注册
      *
      * @param user 实例对象
-     * @return 影响行数
      */
-    int insert(User user);
+    Long register(UserRegisterDTO user);
 
     /**
      * 修改数据
@@ -137,4 +130,6 @@ public interface UserMapper {
      * @param domainId 服务域ID
      */
     String getDomainById(Integer domainId);
+
+    void registerService(Long userId,Integer serviceId);
 }

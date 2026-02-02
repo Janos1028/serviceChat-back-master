@@ -5,6 +5,7 @@ import top.javahai.chatroom.entity.ServiceDomain;
 import top.javahai.chatroom.entity.SupportService;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.dto.UserRegisterDTO;
 import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 
@@ -19,12 +20,7 @@ import java.util.List;
 public interface UserService {
 
 
-    /**
-     * 获取除了当前登录用户的所有user表的数据
-     *
-     * @return
-     */
-    List<UserGetVO> getUsersWithoutCurrentUser();
+
 
     /**
      * 设置用户当前状态为在线
@@ -46,22 +42,14 @@ public interface UserService {
      */
     UserGetVO queryById(Integer id);
 
-    /**
-     * 查询多条数据
-     *
-     * @param offset 查询起始位置
-     * @param limit 查询条数
-     * @return 对象列表
-     */
-    List<User> queryAllByLimit(int offset, int limit);
 
     /**
      * 新增数据
      *
-     * @param user 实例对象
+     * @param userRegisterDTO 实例对象
      * @return 实例对象
      */
-    Integer insert(User user);
+    void insert(UserRegisterDTO userRegisterDTO);
 
     /**
      * 修改数据
