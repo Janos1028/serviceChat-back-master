@@ -706,7 +706,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     private void sendGreetingMsg(Integer domainId, UserInfo user, UserInfo staff, String convId, String serviceName) {
         // 查询双方信息
         // 1. 定制专业的欢迎语内容
-        String content = "您好，您已接入人工服务。这里是" + serviceName + "，很高兴为您服务~";
+        String content = "您好，您已接入人工服务。这里是" + serviceName + "服务团队，很高兴为您服务~";
 
         // 2. 创建消息对象 (注意方向：From Staff -> To User)
         PrivateMsgContent greeting = new PrivateMsgContent();
