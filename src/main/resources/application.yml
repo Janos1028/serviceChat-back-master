@@ -24,10 +24,10 @@ mybatis:
 # JWT 配置
 chatroom:
   jwt:
-    admin-secret-key: ENC(IA94BMT6mhxoKzquh+anPottQYpLPDu1374cv0Lr8OE=)
+    admin-secret-key: fsuit_servie_admin
     admin-ttl: 604800000
     admin-token-name: Authorization
-    user-secret-key: ENC(MMuZPeE0CDKwaS4KI1Hs8enESr47X9KO7nnJnm098ik=)
+    user-secret-key: fsuit_servie_user
     user-ttl: 604800000
     user-token-name: Authorization
 jasypt:
