@@ -30,3 +30,6 @@ chatroom:
     user-secret-key: ENC(MMuZPeE0CDKwaS4KI1Hs8enESr47X9KO7nnJnm098ik=)
     user-ttl: 604800000
     user-token-name: Authorization
+jasypt:
+  encryptor:
+    password: fsuit_servie_chat
