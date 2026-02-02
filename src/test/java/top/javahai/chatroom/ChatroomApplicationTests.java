@@ -17,7 +17,6 @@ class ChatroomApplicationTests {
 
         // 【重要】设置你的加密密钥 (Salt)
         config.setPassword("my_secret_key");
-
         config.setAlgorithm("PBEWithMD5AndDES");
         config.setKeyObtentionIterations("1000");
         config.setPoolSize("1");
