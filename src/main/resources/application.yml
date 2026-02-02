@@ -4,7 +4,7 @@ server:
 
 spring:
   profiles:
-    active: prod # 【关键】默认激活 dev 环境（本地开发）
+    active: dev
 
   # 文件上传配置
   servlet:
