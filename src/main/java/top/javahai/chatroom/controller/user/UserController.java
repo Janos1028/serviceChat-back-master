@@ -11,6 +11,7 @@ import top.javahai.chatroom.entity.RespBean;
 import top.javahai.chatroom.entity.RespPageBean;
 import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.dto.UserRegisterDTO;
 import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserLoginVO;
 import top.javahai.chatroom.service.UserService;
@@ -90,12 +91,9 @@ public class UserController {
      * 注册操作
      */
     @PostMapping("/register")
-    public RespBean addUser(@RequestBody User user){
-        if (userService.insert(user)==1){
-            return RespBean.ok("注册成功！");
-        }else{
-            return RespBean.error("注册失败！");
-        }
+    public RespBean register(@RequestBody UserRegisterDTO userRegisterDTO){
+        userService.insert(userRegisterDTO);
+        return RespBean.ok("注册成功");
     }
 
     /**

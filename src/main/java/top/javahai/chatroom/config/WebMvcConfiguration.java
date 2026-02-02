@@ -38,7 +38,9 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
                         "/login",
                         "/user/checkUsername",
                         "/user/checkNickname",
-                        "/user/public/uploadAvatar"
+                        "/user/public/uploadAvatar",
+                        "/user/chat/getSupportServiceCategories",
+                        "/user/chat/getServiceDomains"
                 );
     }
 

@@ -96,9 +96,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
         // 3. WS 状态通知
         sendWsStatus(fromId, toId, conversationId, "START", domainId, serviceId);
-        // 逻辑：只有当接收者(toId)是客服时，才需要倒计时
-        UserInfo toUserInfo = userCacheUtil.getUserInfo(toId);
-        if (toUserInfo != null && toUserInfo.getUserTypeId() != null && toUserInfo.getUserTypeId() == 1) {
+
+        if ( toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
             // Value: 客服ID (方便监听器知道是谁超时了)
             // Time: 5 分钟
             stringRedisTemplate.opsForValue().set(FIRST_RESPONSE_TIMEOUT_KEY + conversationId, toId.toString(), 5, TimeUnit.MINUTES);
@@ -282,12 +281,12 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         // 用户端收到 END 后会显示"本次服务结束"，紧接着下面我们会推送新的 START，用户体验上就是"转接中..."
         this.closeConversation(conversationId, isActive,null);
         try {
-            Thread.sleep(1000);
+            Thread.sleep(800);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        Random random = new Random();
-        Integer selectedStaffId = supporterList.get(random.nextInt(supporterList.size()));
+
+        Integer selectedStaffId = supporterList.get(0);
         getConversationId(domainId, targetUserId, selectedStaffId, newServiceId);
         // 4. 开启新会话 (核心：以普通用户的名义，去匹配 newServiceId)
        // this.startPrivateChatForUser(domainId, newServiceId, targetUserId, supporterList);
@@ -553,10 +552,10 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             throw new StartConversationFailedException("抱歉，当前该服务团队暂无在线人员，请稍后再试");
         }
 
-        // 2. 随机选择一名支撑人员
-        Random random = new Random();
-        Integer selectedStaffId = supporterList.get(random.nextInt(supporterList.size()));
+        // 2. 选择当前会话最少以及在线状态的支撑人员
+        Integer selectedStaffId = supporterList.get(0);
         String conversationId = getConversationId(domainId, userId, selectedStaffId, serviceId);
+
         ConversationStartVO conversationStartVO = new ConversationStartVO();
         conversationStartVO.setConversationId(conversationId);
         conversationStartVO.setDomainId(domainId);
@@ -564,27 +563,6 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         return conversationStartVO;
     }
 
-    /*private ConversationStartVO autoAssignSupporter(Integer domainId, Integer serviceId, Integer userId) {
-        int count = userMapper.isHasActiveConversationInDomain(domainId, userId);
-        if (count > 0){
-            throw new StartConversationFailedException("当前服务中心已有正在进行的会话，请先结束当前服务后再开启新的会话");
-        }
-        // 1. 获取该服务分类下所有在线的支撑人员
-        List<Integer> supporterList = userMapper.getOnlineSupporterByServiceId(domainId, serviceId);
-        if (supporterList == null || supporterList.isEmpty()) {
-            throw new StartConversationFailedException("抱歉，当前该服务团队暂无在线人员，请稍后再试");
-        }
-
-        // 2. 随机选择一名支撑人员
-        Random random = new Random();
-        Integer selectedStaffId = supporterList.get(random.nextInt(supporterList.size()));
-        String conversationId = getConversationId(domainId, userId, selectedStaffId, serviceId);
-        ConversationStartVO conversationStartVO = new ConversationStartVO();
-        conversationStartVO.setConversationId(conversationId);
-        conversationStartVO.setDomainId(domainId);
-        conversationStartVO.setUserId(selectedStaffId);
-        return conversationStartVO;
-    }*/
 
     @Override
     public List<UserPrivateMsgContentVO> getHistoryMsg(Integer userId, Integer serviceDomainId, Integer page, Integer size) {

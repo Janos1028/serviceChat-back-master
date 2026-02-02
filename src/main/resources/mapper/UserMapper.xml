@@ -29,30 +29,7 @@
         where username = #{username}
     </select>
 
-    <!--获取所有用户数据 -->
-    <select id="getUsersWithoutCurrentUser" resultMap="UserMap" parameterType="java.lang.Integer">
-        select id,
-               username,
-               nickname,
-               user_profile,
-               user_state_id,
-               is_enabled,
-               is_locked,
-               user_type_id,
-               (
-                   SELECT MAX(create_time)
-                   FROM private_msg_content p
-                   WHERE (p.from_id = u.id AND p.to_id = #{id})
-                      OR (p.from_id = #{id} AND p.to_id = u.id)
-               ) as lastMessageTime
-        from user u
-        where id != #{id}
-          and user_type_id = 1
-          and is_locked = 0
-        order by
-        lastMessageTime DESC,
-        u.user_state_id ASC
-    </select>
+
 
     <!--查询单个-->
     <select id="queryById" resultType="top.javahai.chatroom.entity.User">
@@ -114,10 +91,13 @@
     </select>
 
     <!--新增所有列-->
-    <insert id="insert" keyProperty="id" useGeneratedKeys="true">
-        insert into user(username, nickname, password, user_profile, user_state_id, is_enabled, is_locked, user_type_id)
-        values (#{username}, #{nickname}, #{password}, #{userProfile}, #{userStateId}, #{isEnabled}, #{isLocked},
-                #{userTypeId})
+    <insert id="register" keyProperty="id" useGeneratedKeys="true">
+        insert into user(username, nickname, password, user_profile, user_type_id, service_domain_id)
+        values (#{username}, #{nickname}, #{password}, #{userProfile}, #{userTypeId}, #{serviceDomainId})
+    </insert>
+    <insert id="registerService">
+        insert into user_support_services (user_id, service_id)
+        values (#{userId}, #{serviceId})
     </insert>
 
     <!--通过主键修改数据-->
@@ -159,7 +139,8 @@
     <update id="setUserStateToOn">
         update user
         set user_state_id=1
-        where id = #{id} AND user_state_id=2
+        where id = #{id}
+          AND user_state_id = 2
     </update>
     <update id="setUserStateToLeave">
         update user
@@ -203,14 +184,11 @@
         from user u
         where id != #{id}
           and is_locked = 0
-        ORDER BY
-            (
-                SELECT MAX(create_time)
-                FROM private_msg_content p
-                WHERE (p.from_id = u.id AND p.to_id = #{id})
-                   OR (p.from_id = #{id} AND p.to_id = u.id)
-            ) DESC,
-            u.user_state_id ASC
+        ORDER BY (SELECT MAX(create_time)
+                  FROM private_msg_content p
+                  WHERE (p.from_id = u.id AND p.to_id = #{id})
+                     OR (p.from_id = #{id} AND p.to_id = u.id)) DESC,
+                 u.user_state_id ASC
     </select>
     <select id="selectUser" resultType="top.javahai.chatroom.entity.vo.UserCardVO">
         select id,
@@ -222,14 +200,13 @@
         where id = #{id}
     </select>
     <select id="getRecentConversation" resultType="top.javahai.chatroom.entity.vo.UserGetVO">
-        SELECT
-            u.id,
-            u.username,
-            u.nickname,
-            u.user_profile AS userProfile,
-            u.user_state_id AS userStateId,
-            u.user_type_id AS userTypeId,
-            MAX(m.create_time) AS lastMessageTime
+        SELECT u.id,
+               u.username,
+               u.nickname,
+               u.user_profile     AS userProfile,
+               u.user_state_id    AS userStateId,
+               u.user_type_id     AS userTypeId,
+               MAX(m.create_time) AS lastMessageTime
         FROM user u
                  INNER JOIN private_msg_content m
                             ON (u.id = m.from_id OR u.id = m.to_id)
@@ -260,18 +237,24 @@
         WHERE service_domain_id = #{domainId}
     </select>
     <select id="getOnlineSupporterByServiceId" resultType="integer">
-        SELECT
-            u.id
+        SELECT u.id
         FROM user u
                  INNER JOIN user_support_services uss ON u.id = uss.user_id
+                 LEFT JOIN private_chat_conversation c
+                           ON (u.id = c.user_id_1 OR u.id = c.user_id_2)
+                               AND c.is_active = 1
         WHERE u.user_type_id = 1
           AND uss.service_id = #{serviceId}
           AND u.user_state_id = 1
           AND u.is_locked = 0
           AND u.service_domain_id = #{domainId}
+        GROUP BY u.id
+        ORDER BY count(c.id) ASC
+
     </select>
     <select id="getAllServiceDomains" resultType="top.javahai.chatroom.entity.ServiceDomain">
-        SELECT id, name FROM service_domain
+        SELECT id, name
+        FROM service_domain
     </select>
     <select id="getSupportServicesByDomainId" resultType="top.javahai.chatroom.entity.SupportService">
         SELECT id, name
@@ -284,17 +267,20 @@
         where id = #{id}
     </select>
     <select id="getServiceNameById" resultType="string">
-        SELECT name FROM support_services WHERE id = #{serviceId}
+        SELECT name
+        FROM support_services
+        WHERE id = #{serviceId}
     </select>
     <select id="isHasActiveConversationInDomain" resultType="java.lang.Integer">
-        SELECT count(*) FROM private_chat_conversation
-        WHERE
-          (user_id_1 = #{userId} OR user_id_2 = #{userId})
+        SELECT count(*)
+        FROM private_chat_conversation
+        WHERE (user_id_1 = #{userId} OR user_id_2 = #{userId})
           AND is_active = 1
           AND service_domain_id = #{domainId}
     </select>
     <select id="getDomainById" resultType="string">
-        SELECT name FROM service_domain
+        SELECT name
+        FROM service_domain
         WHERE id = #{domainId}
     </select>
 
@@ -305,7 +291,9 @@
         where id = #{id}
     </update>
     <update id="changeUserState">
-        UPDATE user set user_state_id=#{stateId} where id=#{id}
+        UPDATE user
+        set user_state_id=#{stateId}
+        where id = #{id}
     </update>
     <delete id="deleteByIds">
         delete from user where id in

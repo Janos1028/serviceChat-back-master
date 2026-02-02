@@ -8,11 +8,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 
 import top.javahai.chatroom.context.BaseContext;
 import top.javahai.chatroom.entity.*;
 import top.javahai.chatroom.entity.dto.UserLoginDTO;
+import top.javahai.chatroom.entity.dto.UserRegisterDTO;
 import top.javahai.chatroom.entity.vo.UserCardVO;
 import top.javahai.chatroom.entity.vo.UserGetVO;
 import top.javahai.chatroom.handler.exception.*;
@@ -49,32 +51,13 @@ public class UserServiceImpl implements UserService{
 
 
     /**
-     * 获取除了当前用户的所有user表的数据
-     *
-     * @return
-     */
-    @Override
-    public List<UserGetVO> getUsersWithoutCurrentUser() {
-        User user = (User)BaseContext.getCurrent();
-        Integer userTypeId = user.getUserTypeId();
-        if (userTypeId == 1) {
-            // 当前用户是咨询人，可以获取所有用户
-            List<UserGetVO> userGetVOS = userMapper.ConstantGetUsersWithoutCurrentUser(user.getId());
-            log.info("获取到的用户："+userGetVOS);
-            return userGetVOS;
-        }else {
-            // 当前用户是普通用户，只能获取咨询人
-            return userMapper.getUsersWithoutCurrentUser(user.getId());
-        }
-    }
-    /**
      * 设置用户当前状态为在线
      * @param id 用户id
      */
     @Override
     public void setUserStateToOn(Integer id) {
         userMapper.setUserStateToOn(id);
-        // 【新增】广播用户上线消息
+        // 广播用户上线消息
         broadcastUserStatus(id, 1); // 1 代表在线
     }
     /**
@@ -84,11 +67,11 @@ public class UserServiceImpl implements UserService{
     @Override
     public void setUserStateToLeave(Integer id) {
         userMapper.setUserStateToLeave(id);
-        // 【新增】广播用户离线消息
+        // 广播用户离线消息
         broadcastUserStatus(id, 2); // 2 代表离线
     }
     /**
-     * 【新增】辅助方法：广播用户状态变更
+     * 辅助方法：广播用户状态变更
      * 推送目标：/topic/userStatus (所有订阅了该主题的客户端都能收到)
      */
     private void broadcastUserStatus(Integer userId, Integer statusId) {
@@ -107,22 +90,21 @@ public class UserServiceImpl implements UserService{
         return userGetVO;
     }
 
-    @Override
-    public List<User> queryAllByLimit(int offset, int limit) {
-        return this.userMapper.queryAllByLimit(offset, limit);
-    }
 
     @Override
-    public Integer insert(User user) {
-        // 使用 MD5 加密
+    @Transactional(rollbackFor = Exception.class)
+    public void insert(UserRegisterDTO userRegisterDTO) {
         // 注意：这里使用的是 Spring 工具类 org.springframework.util.DigestUtils
-        String encodePass = DigestUtils.md5DigestAsHex(user.getPassword().getBytes(StandardCharsets.UTF_8));
-        user.setPassword(encodePass);
-
-        user.setUserStateId(2);
-        user.setEnabled(true);
-        user.setLocked(false);
-        return  this.userMapper.insert(user);
+        String encodePass = DigestUtils.md5DigestAsHex(userRegisterDTO.getPassword().getBytes(StandardCharsets.UTF_8));
+        userRegisterDTO.setPassword(encodePass);
+        userMapper.register(userRegisterDTO);
+        Long userId = userRegisterDTO.getId();
+        if (userRegisterDTO.getUserTypeId()!=null && userRegisterDTO.getUserTypeId() == 1){
+            List<Integer> serviceIds = userRegisterDTO.getServiceIds();
+            for (Integer serviceId : serviceIds){
+                userMapper.registerService(userId,serviceId);
+            }
+        }
     }
 
     @Override
@@ -204,7 +186,8 @@ public class UserServiceImpl implements UserService{
         if (!inputPass.equals(user.getPassword())) {
             throw new PasswordErrorException("密码错误");
         }
-        this.setUserStateToOn(user.getId());
+
+        userMapper.setUserStateToOn(user.getId());
         if (redisTemplate.opsForValue().get(USER_ONLINE+user.getId())==null){
             UserInfo userInfo = new UserInfo();
             BeanUtils.copyProperties(user, userInfo);
