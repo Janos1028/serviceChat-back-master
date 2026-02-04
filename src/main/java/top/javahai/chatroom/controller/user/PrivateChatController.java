@@ -47,8 +47,6 @@ public class PrivateChatController {
     /**
      * 客服请求关闭会话
      *
-     * @param conversationId
-     * @return
      */
     @PostMapping("/requestClose")
     public RespBean requestClose(@RequestParam String conversationId, @RequestParam Short isActive) {
@@ -57,8 +55,6 @@ public class PrivateChatController {
 
     /**
      * 客服点击“未解决”重新开启会话
-     * @param conversationId
-     * @return
      */
     @PostMapping("/confirmUnsolved")
     public RespBean confirmUnsolved(@RequestParam String conversationId, @RequestParam Integer messageId) {
@@ -73,6 +69,11 @@ public class PrivateChatController {
     @PostMapping("/close")
     public RespBean closeConversation(@RequestParam String conversationId, @RequestParam Integer messageId) {
         return privateChatService.closeConversation(conversationId, CLOSE_CONVERSATION, messageId);
+    }
+
+    @PostMapping("/forceClose")
+    public RespBean forceCloseConversation(@RequestParam String conversationId, @RequestParam Short isActive) {
+        return privateChatService.closeConversation(conversationId, isActive, null);
     }
 
     /**
@@ -187,9 +188,10 @@ public class PrivateChatController {
     @PostMapping("/transfer")
     public RespBean transfer(@RequestParam String conversationId,
                              @RequestParam Integer newServiceId,
-                             @RequestParam Integer domainId) {
+                             @RequestParam Integer domainId,
+                             @RequestParam Short isActive) {
 
-        privateChatService.transferConversation(conversationId, newServiceId, domainId, FIRST_RESPONSE_CONVERSATION);
+        privateChatService.transferConversation(conversationId, newServiceId, domainId, isActive);
         return RespBean.ok("转接成功");
     }
 }

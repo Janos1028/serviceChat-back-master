@@ -150,7 +150,6 @@ public class UserController {
     public RespPageBean getAllUserByPage(@RequestParam(value = "page",defaultValue = "1") Integer page,
                                          @RequestParam(value = "size",defaultValue = "10") Integer size,
                                          String keyword,Integer isLocked){
-        log.info("getAllUserByPage: page={},size={},keyword={},isLocked={}",page,size,keyword,isLocked);
         return userService.getAllUserByPage(page,size,keyword,isLocked);
     }
 
@@ -160,7 +159,7 @@ public class UserController {
      * @return
      */
     @PostMapping("/supporter/changeUserState")
-    public RespBean changeUserState(Integer stateId){
+    public RespBean changeUserState(@RequestParam Integer stateId){
         userService.changeUserState(stateId);
         return RespBean.ok();
     }
