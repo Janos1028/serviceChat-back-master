@@ -126,7 +126,7 @@ public class PrivateChatController {
 
 
     /**
-     * 【新增】查询与目标用户的会话状态
+     * 查询与目标用户的会话状态
      *
      * @param toId 对方ID
      * @return 如果有活跃会话返回会话ID，否则返回null或特定状态
@@ -166,8 +166,8 @@ public class PrivateChatController {
 
     @PostMapping("/updateMsgStateToRead")
     public RespBean updateMsgStateToRead(@RequestParam Integer fromId) {
-        // 将 fromId 发给 currentUserId 的所有消息状态置为 1
-        privateChatService.updateMsgStateToRead(fromId);
+        User currentUser = (User) BaseContext.getCurrent();
+        privateChatService.updateMsgStateToRead(fromId, currentUser.getId());
         return RespBean.ok();
     }
 
@@ -181,7 +181,8 @@ public class PrivateChatController {
     public RespBean updateServiceMsgRead(
             @RequestParam Integer domainId,
             @RequestParam(required = false) Integer staffId) {
-        privateChatService.updateServiceMsgRead(domainId, staffId);
+        User currentUser = (User) BaseContext.getCurrent();
+        privateChatService.updateServiceMsgRead(domainId, staffId, currentUser.getId());
         return RespBean.ok();
     }
 

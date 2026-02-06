@@ -19,13 +19,13 @@ public interface PrivateChatService {
     // 获取某用户所有未读会话
     List<Integer> getUnreadSenders(Integer userId);
 
-    void updateMsgStateToRead(Integer fromId);
+    void updateMsgStateToRead(Integer fromId, Integer id);
 
     ConversationStartVO startServiceConversation(Integer domainId, Integer serviceId, Integer userId);
 
     List<UserPrivateMsgContentVO> getHistoryMsg(Integer userId, Integer serviceDomainId, Integer page, Integer size);
 
-    void updateServiceMsgRead(Integer domainId, Integer staffId);
+    void updateServiceMsgRead(Integer domainId, Integer staffId, Integer currentId);
 
     void transferConversation(String conversationId, Integer newServiceId, Integer domainId, Short isActive);
 

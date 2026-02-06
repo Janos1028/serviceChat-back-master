@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import static top.javahai.chatroom.constant.ConversationConstant.*;
 import static top.javahai.chatroom.constant.PrivateChatMsg.*;
 import static top.javahai.chatroom.constant.RedisConstant.*;
+
 @Slf4j
 @Service
 public class PrivateChatServiceImpl implements PrivateChatService {
@@ -83,11 +84,19 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             newConv.setServiceName(serviceName);
             conversationMapper.insert(newConv);
 
+            ChatContext ctx = ChatContext.builder()
+                    .domainId(domainId)
+                    .fromUser(fromUser)
+                    .toUser(toUser)
+                    .conversationId(conversationId)
+                    .serviceName(serviceName)
+                    .build();
+
             // 存入数据库！Type=4 代表会话开启
-            saveAndPushSystemMessage(domainId,fromUser, toUser, conversationId, 4, "会话已开启", serviceName,READ);
+            saveAndPushSystemMessage(ctx, 4, "会话已开启", READ);
 
             // 发送打招呼消息 (Type=1)
-            sendGreetingMsg(domainId,fromUser, toUser, conversationId, serviceName);
+            sendGreetingMsg(ctx);
         }
 
         // 2. Redis 同步
@@ -97,7 +106,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         // 3. WS 状态通知
         sendWsStatus(fromId, toId, conversationId, "START", domainId, serviceId);
 
-        if ( toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
+        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
             // Value: 客服ID (方便监听器知道是谁超时了)
             // Time: 5 分钟
             stringRedisTemplate.opsForValue().set(FIRST_RESPONSE_TIMEOUT_KEY + conversationId, toId.toString(), 5, TimeUnit.MINUTES);
@@ -107,6 +116,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
     /**
      * 用户点击“已解决”
+     *
      * @param conversationId
      * @param isActive
      * @param messageId
@@ -118,7 +128,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         if (conv == null) {
             return RespBean.error("会话不存在");
         }
-        if (conv.getIsActive().equals(FORCE_END) || conv.getIsActive().equals(CLOSE_CONVERSATION)){
+        if (conv.getIsActive().equals(FORCE_END) || conv.getIsActive().equals(CLOSE_CONVERSATION)) {
             return RespBean.error("会话已结束");
         }
         if (messageId != null) {
@@ -131,10 +141,17 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         UserInfo user1 = userCacheUtil.getUserInfo(conv.getUserId1());
         UserInfo user2 = userCacheUtil.getUserInfo(conv.getUserId2());
 
-        if (isActive == 4){
-            saveAndPushSystemMessage(conv.getServiceDomainId(),user1, user2, conversationId, 5, "支撑人员已经强制关闭会话，会话结束", null,READ);
-        }else {
-            saveAndPushSystemMessage(conv.getServiceDomainId(),user1, user2, conversationId, 5, "会话已结束", null,READ);
+        ChatContext ctx = ChatContext.builder()
+                .domainId(conv.getServiceDomainId())
+                .fromUser(user1)
+                .toUser(user2)
+                .conversationId(conversationId)
+                .serviceName(null) // 注意：conv里得有这个字段，或者传null
+                .build();
+        if (isActive == 4) {
+            saveAndPushSystemMessage(ctx, 5, "支撑人员已经强制关闭会话，会话结束", READ);
+        } else {
+            saveAndPushSystemMessage(ctx, 5, "会话已结束", READ);
         }
 
         // Redis 移除
@@ -168,7 +185,6 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         ratingMsg.setContent("服务已结束，请评价");
 
 
-
         // 推送给用户 (User1) - 注意：推送到 /queue/chat 频道，让它出现在消息列表里
         simpMessagingTemplate.convertAndSendToUser(
                 String.valueOf(conv.getUserId1()),
@@ -190,12 +206,11 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
     /**
      * 支撑人员界面的更新消息状态为已读
+     *
      * @param fromId
      */
     @Override
-    public void updateMsgStateToRead(Integer fromId) {
-        User currentUser = (User) BaseContext.getCurrent();
-        Integer currentUserId = currentUser.getId();
+    public void updateMsgStateToRead(Integer fromId,Integer currentUserId) {
 
         // 1. 数据库更新：将 fromId 发给 currentUserId 的消息标记为已读
         msgMapper.updateMsgStateToRead(fromId, currentUserId);
@@ -206,39 +221,39 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
     /**
      * 【场景B】用户端专用：更新服务域消息为已读
-     * @param domainId 服务域ID (必填)
-     * @param staffId  具体的客服ID (选填)
+     *
+     * @param domainId  服务域ID (必填)
+     * @param staffId   具体的客服ID (选填)
+     * @param currentId
      */
     @Override
-    public void updateServiceMsgRead(Integer domainId, Integer staffId) {
-        User currentUser = (User) BaseContext.getCurrent();
-        Integer currentUserId = currentUser.getId();
+    public void updateServiceMsgRead(Integer domainId, Integer staffId, Integer currentId) {
 
         if (staffId != null) {
             // === 情况1：精确更新 (前端明确知道是哪个客服) ===
             // 场景：在聊天窗口中，或者收到了具体客服的新消息
 
             // 1. 数据库更新：仅更新该客服发给我的消息
-            msgMapper.updateMsgStateToRead(staffId, currentUserId);
+            msgMapper.updateMsgStateToRead(staffId, currentId);
 
             // 2. 发送回执：必须发，让该客服知道已读
-            sendReadReceipt(currentUserId, staffId);
+            sendReadReceipt(currentId, staffId);
 
         } else {
             // === 情况2：批量已读 (逻辑大改) ===
 
             // 1. 【核心修正】先查出名单：谁在这个域下给我发了未读消息？
             // 必须在更新数据库之前查，否则更新完就查不到了(state都变1了)
-            List<Integer> staffIds = privateMsgContentMapper.getUnreadStaffIdsByDomain(domainId, currentUserId);
+            List<Integer> staffIds = privateMsgContentMapper.getUnreadStaffIdsByDomain(domainId, currentId);
 
             // 2. 更新数据库 (将该域下所有消息置为已读)
-            privateMsgContentMapper.updateStateByDomain(domainId, currentUserId);
+            privateMsgContentMapper.updateStateByDomain(domainId, currentId);
 
             // 3. 【遍历发送】给名单里的每一位客服发送回执
             if (staffIds != null && !staffIds.isEmpty()) {
                 for (Integer targetStaffId : staffIds) {
                     // 只有列表里的人才需要通知，精准且全面
-                    sendReadReceipt(currentUserId, targetStaffId);
+                    sendReadReceipt(currentId, targetStaffId);
                 }
             }
         }
@@ -249,10 +264,10 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     public void transferConversation(String conversationId, Integer newServiceId, Integer domainId, Short isActive) {
         // 1. 获取当前会话信息
         PrivateChatConversation oldConv = privateChatConversationMapper.queryById(conversationId);
-        if (oldConv == null || oldConv.getIsActive()!=1) {
+        if (oldConv == null || oldConv.getIsActive() != 1) {
             throw new ConverstaionNotFoundException("当前会话无效或已结束");
         }
-        if (!isActive.equals(CLOSE_CONVERSATION)){
+        if (!isActive.equals(CLOSE_CONVERSATION)) {
             throw new TransferConversationException("状态参数异常");
         }
         // 2. 识别身份：谁是普通用户？
@@ -285,7 +300,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         // 3. 结束当前会话 (通知旧客服和用户)
         // 注意：这里我们调用 closePrivateChat，它会推送 END 消息。
         // 用户端收到 END 后会显示"本次服务结束"，紧接着下面我们会推送新的 START，用户体验上就是"转接中..."
-        this.closeConversation(conversationId, isActive,null);
+        this.closeConversation(conversationId, isActive, null);
         try {
             Thread.sleep(800);
         } catch (InterruptedException e) {
@@ -295,7 +310,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         Integer selectedStaffId = supporterList.get(0);
         getConversationId(domainId, targetUserId, selectedStaffId, newServiceId);
         // 4. 开启新会话 (核心：以普通用户的名义，去匹配 newServiceId)
-       // this.startPrivateChatForUser(domainId, newServiceId, targetUserId, supporterList);
+        // this.startPrivateChatForUser(domainId, newServiceId, targetUserId, supporterList);
     }
 
     @Override
@@ -318,10 +333,10 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     @Transactional(rollbackFor = Exception.class)
     public void handleFirstResponseTimeout(String conversationId) {
         PrivateChatConversation privateChatConversation = conversationMapper.queryById(conversationId);
-        if (privateChatConversation == null){
+        if (privateChatConversation == null) {
             throw new TransferConversationException("会话不存在");
         }
-        if (privateChatConversation.getIsActive()!=1){
+        if (privateChatConversation.getIsActive() != 1) {
             throw new TransferConversationException("会话已结束");
         }
         Integer serviceId = privateChatConversation.getServiceId();
@@ -352,6 +367,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             sendPrivateSystemMessage(
                     serviceDomainId,
                     customerUser,
+                    staffUser.getId(),
                     conversationId,
                     "当前对话调度人员超时未响应，已为您分配其他调度人员进行支撑。"
             );
@@ -360,6 +376,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             sendPrivateSystemMessage(
                     serviceDomainId,
                     staffUser,
+                    customerUser.getId(),
                     conversationId,
                     "您超时未响应，系统已分配其他调度人员进行支撑。"
             );
@@ -375,22 +392,15 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             sendPrivateSystemMessage(
                     serviceDomainId,
                     customerUser,
+                    staffUser.getId(),
                     conversationId,
                     String.format("很抱歉，%s，服务自动结束。请稍后重试。", failReason)
             );
 
-            // 4.2 给【旧客服】发失败通知 (告诉他结果变了)
-            // 之前告诉他“分配其他人”，现在告诉他“没人接，关了”
-            sendPrivateSystemMessage(
-                    serviceDomainId,
-                    staffUser,
-                    conversationId,
-                    String.format("转接失败（%s），系统已自动关闭该会话。", failReason)
-            );
 
             // 5. 强制关闭
             try {
-                this.closeConversation(conversationId, FIRST_RESPONSE_CONVERSATION,null);
+                this.closeConversation(conversationId, FIRST_RESPONSE_CONVERSATION, null);
             } catch (Exception ex) {
                 log.error("关闭会话异常", ex);
             }
@@ -414,18 +424,17 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         UserInfo staff = userCacheUtil.getUserInfo(conv.getUserId2());
         UserInfo customer = userCacheUtil.getUserInfo(conv.getUserId1());
 
+        ChatContext ctx = ChatContext.builder()
+                .domainId(conv.getServiceDomainId())
+                .fromUser(staff)
+                .toUser(customer)
+                .conversationId(conversationId)
+                .serviceName(conv.getServiceName())
+                .build();
+
         // 3. 推送系统交互消息 (MessageTypeId = 7)
         // 这个消息类型 7 专门给前端用来渲染“已解决/未解决”按钮
-        PrivateMsgContent sysMsg = saveAndPushSystemMessage(
-                conv.getServiceDomainId(),
-                staff,    // 发送者（客服）
-                customer, // 接收者（用户）
-                conversationId,
-                7,        // 新增的消息类型：确认卡片
-                "客服已发起服务结束申请，请确认您的问题是否已解决？",
-                conv.getServiceName(),
-                WAITING
-        );
+        PrivateMsgContent sysMsg = saveAndPushSystemMessage(ctx, 7, "客服已发起服务结束申请，请确认您的问题是否已解决？", WAITING);
 
         Integer msgId = sysMsg.getId();
         if (msgId != null) {
@@ -444,14 +453,14 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     @Override
     public RespBean reopenConversation(String conversationId, Integer messageId) {
         PrivateChatConversation conv = conversationMapper.queryById(conversationId);
-        if (conv == null){
+        if (conv == null) {
             return RespBean.error("会话不存在");
         }
-        if (conv.getIsActive().equals(FORCE_END) || conv.getIsActive().equals(CLOSE_CONVERSATION)){
+        if (conv.getIsActive().equals(FORCE_END) || conv.getIsActive().equals(CLOSE_CONVERSATION)) {
             return RespBean.error("会话已结束");
         }
         if (conv.getIsActive().equals(WAITING_FOR_USER_CONFIRM)) {
-            if (messageId != null ) {
+            if (messageId != null) {
                 broadcastConvConfirm(conversationId, messageId, conv, REJECT);
             }
             // 1. 状态恢复为 1 (进行中)
@@ -462,14 +471,15 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             UserInfo customer = userCacheUtil.getUserInfo(conv.getUserId1());
             UserInfo staff = userCacheUtil.getUserInfo(conv.getUserId2());
 
-            saveAndPushSystemMessage(
-                    conv.getServiceDomainId(),
-                    customer, staff, conversationId,
-                    5, // 使用系统提示消息类型
-                    "用户反馈问题未解决，会话继续",
-                    null,
-                    READ
-            );
+            ChatContext ctx = ChatContext.builder()
+                    .domainId(conv.getServiceDomainId())
+                    .fromUser(customer)
+                    .toUser(staff)
+                    .conversationId(conversationId)
+                    .serviceName(null)
+                    .build();
+
+            saveAndPushSystemMessage(ctx, 5, "用户反馈问题未解决，会话继续", READ);
             return RespBean.ok("会话已恢复");
         }
         return RespBean.error("会话状态异常");
@@ -500,7 +510,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
      * 发送单向可见的系统消息
      * 解决双重推送问题，确保只有目标用户能看到
      */
-    private void sendPrivateSystemMessage(Integer domainId, UserInfo targetUser, String convId, String content) {
+    private void sendPrivateSystemMessage(Integer domainId, UserInfo targetUser, Integer otherUserId,String convId, String content) {
         // 1. 存入数据库
         // 关键点：From 和 To 都是自己。
         // 这样对方查历史记录(Where from=对方 or to=对方)时，查不到这条消息。
@@ -521,13 +531,17 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msg.put("messageTypeId", 5);
         msg.put("createTime", new Date());
         msg.put("conversationId", convId);
-
+        msg.put("userTypeId",targetUser.getUserTypeId());
         // 填充必要字段，防止前端报错
         msg.put("from", targetUser.getUsername());
         msg.put("to", targetUser.getUsername());
         msg.put("fromId", targetUser.getId());
         msg.put("toId", targetUser.getId());
-
+        if (targetUser.getUserTypeId() == 0){
+            msg.put("serviceDomainId", domainId);
+        }else {
+            msg.put("otherUserId", otherUserId);
+        }
         // 3. 只推送一次！
         simpMessagingTemplate.convertAndSendToUser(
                 String.valueOf(targetUser.getId()),
@@ -542,7 +556,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     public ConversationStartVO startServiceConversation(Integer domainId, Integer serviceId, Integer userId) {
         // 3. 调用原有的开启会话逻辑，此时 toId 变为具体的员工ID
         int count = userMapper.isHasActiveConversationInDomain(domainId, userId);
-        if (count > 0){
+        if (count > 0) {
             throw new StartConversationFailedException("当前服务中心已有正在进行的会话，请先结束当前服务后再开启新的会话");
         }
         // 1. 获取该服务分类下所有在线的支撑人员
@@ -596,16 +610,26 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     }
 
 
-
-
     @Override
     public void saveMsg(PrivateMsgContent msg) {
         msgMapper.insert(msg);
     }
+
     @Override
     public String getActiveConversationId(Integer userId1, Integer userId2) {
+        Object cachedId = redisTemplate.opsForHash().get(SESSION_KEY_PREFIX + userId1, userId2.toString());
+        if (cachedId != null) return cachedId.toString();
+
+        // 2. 查库
         PrivateChatConversation conv = conversationMapper.getActiveConversation(userId1, userId2);
-        return conv != null ? conv.getId() : null;
+
+        if (conv != null) {
+            // 3. 【关键】查到后回填 Redis，防止下条消息继续穿透 DB
+            redisTemplate.opsForHash().put(SESSION_KEY_PREFIX + userId1, userId2.toString(), conv.getId());
+            redisTemplate.opsForHash().put(SESSION_KEY_PREFIX + userId2, userId1.toString(), conv.getId());
+            return conv.getId();
+        }
+        return null;
     }
 
 
@@ -622,7 +646,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         updateMsg.put("content", msg.getContent());
         updateMsg.put("createTime", msg.getCreateTime());
         updateMsg.put("state", msg.getState());        // 【关键】最新的状态 (3 或 4)
-
+        updateMsg.put("serviceDomainId", domainId);
         // --- A. 推送给用户 ---
         Map<String, Object> msgForUser = new HashMap<>(updateMsg);
         // 伪装发送者（保持和列表里的一致）
@@ -645,12 +669,19 @@ public class PrivateChatServiceImpl implements PrivateChatService {
                 String.valueOf(staff.getId()), "/queue/chat", msgForStaff
         );
     }
+
     /**
      * 【核心逻辑】保存并推送系统消息
      * 1. 存入数据库：保证刷新后还在。
      * 2. 推送给双方：保证实时看到。
      */
-    private PrivateMsgContent saveAndPushSystemMessage(Integer domainId, UserInfo fromUser, UserInfo toUser, String convId, Integer type, String content, String serviceName, Integer state) {
+    private PrivateMsgContent saveAndPushSystemMessage(ChatContext ctx, Integer type, String content, Integer state) {
+        Integer domainId = ctx.getDomainId();
+        UserInfo fromUser = ctx.getFromUser();
+        UserInfo toUser = ctx.getToUser();
+        String convId = ctx.getConversationId();
+        String serviceName = ctx.getServiceName();
+
         // 1. 存入数据库 (保证刷新后存在)
         PrivateMsgContent sysMsg = new PrivateMsgContent();
         sysMsg.setFromId(fromUser.getId());
@@ -663,7 +694,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         sysMsg.setState(state);
         msgMapper.insert(sysMsg); // --- 写入 DB ---
 
-        // 3. 推送给 User1 (发起者/用户)
+        // 3. 推送给 User1 (接收者用户)
         Map<String, Object> msgFor1 = new HashMap<>();
         msgFor1.put("content", content);
         msgFor1.put("messageTypeId", type);
@@ -671,18 +702,20 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msgFor1.put("conversationId", convId);
         msgFor1.put("id", sysMsg.getId());
         msgFor1.put("state", state);
-        // 【核心修复】如果对方(User2)是客服，必须伪装成服务号
-        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
+        msgFor1.put("serviceDomainId", domainId);
+        msgFor1.put("fromId", fromUser.getId());
+        msgFor1.put("to", toUser.getUsername());
+        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 0) {
             msgFor1.put("from", "service_" + domainId); // 虚拟账号
             msgFor1.put("fromNickname", serviceName);      // 统一昵称
         } else {
-            msgFor1.put("from", toUser.getUsername());
-            msgFor1.put("fromNickname", toUser.getNickname());
+            msgFor1.put("from", fromUser.getUsername());
+            msgFor1.put("fromNickname", fromUser.getNickname());
         }
 
-        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromUser.getId()), "/queue/chat", msgFor1);
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUser.getId()), "/queue/chat", msgFor1);
 
-        // 4. 推送给 User2 (接收者/客服) - 客服可以看到真实的用户信息
+        // 4. 推送给 User2 (发起者客服) - 客服可以看到真实的用户信息
         Map<String, Object> msgFor2 = new HashMap<>();
         msgFor2.put("content", content);
         msgFor2.put("messageTypeId", type);
@@ -693,16 +726,28 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msgFor2.put("conversationId", convId);
         msgFor2.put("state", state);
         msgFor2.put("id", sysMsg.getId());
-        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUser.getId()), "/queue/chat", msgFor2);
+        msgFor2.put("fromId", fromUser.getId());
+        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 0) {
+            msgFor1.put("to", "service_" + domainId); // 虚拟账号
+        } else {
+            msgFor1.put("to", toUser.getUsername());
+        }
+        msgFor2.put("to", toUser.getUsername());
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromUser.getId()), "/queue/chat", msgFor2);
         return sysMsg;
     }
+
     /**
      * 发送打招呼消息
      * 逻辑调整为：由被分配的客服（staffId）向用户（userId）发送欢迎语
-     *
-     * @param convId  会话ID
      */
-    private void sendGreetingMsg(Integer domainId, UserInfo user, UserInfo staff, String convId, String serviceName) {
+    private void sendGreetingMsg(ChatContext ctx) {
+        Integer domainId = ctx.getDomainId();
+        UserInfo user = ctx.getFromUser(); // 在start流程中，from通常是用户
+        UserInfo staff = ctx.getToUser();  // 在start流程中，to通常是客服
+        String convId = ctx.getConversationId();
+        String serviceName = ctx.getServiceName();
+
         // 查询双方信息
         // 1. 定制专业的欢迎语内容
         String content = "您好，您已接入人工服务。这里是" + serviceName + "服务团队，很高兴为您服务~";
@@ -733,7 +778,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msgForUser.put("to", user.getUsername());
         // 篡改发送者信息
         msgForUser.put("from", "service_" + domainId); // 虚拟账号
-        msgForUser.put("fromNickname", serviceName+"团队");      // 统一昵称
+        msgForUser.put("fromNickname", serviceName + "团队");      // 统一昵称
         // 保留 fromId (真实ID)，用于前端发送已读回执 (ID本身不包含隐私)
         msgForUser.put("fromId", staff.getId());
 
@@ -749,7 +794,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         simpMessagingTemplate.convertAndSendToUser(String.valueOf(staff.getId()), "/queue/chat", msgForStaff);
     }
 
-    private void sendWsStatus(Integer u1, Integer u2, String convId, String type, Integer domainId , Integer serviceId) {
+    private void sendWsStatus(Integer u1, Integer u2, String convId, String type, Integer domainId, Integer serviceId) {
         UserInfo user1 = userCacheUtil.getUserInfo(u1);
         UserInfo user2 = userCacheUtil.getUserInfo(u2);
         String serviceName = null;
@@ -801,7 +846,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     }
 
     /**
-     * 【新增】内部辅助方法：构造并发送已读回执
+     * 内部辅助方法：构造并发送已读回执
+     *
      * @param readerId 谁读了消息（当前操作人，通常是接收者）
      * @param senderId 谁发了消息（消息发送者，回执接收人）
      */

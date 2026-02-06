@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.listener.KeyExpirationEventMessageListener;
+import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
 import top.javahai.chatroom.constant.RedisConstant;
@@ -31,6 +32,11 @@ public class RedisKeyExpirationListener extends KeyExpirationEventMessageListene
 
     public RedisKeyExpirationListener(RedisMessageListenerContainer listenerContainer) {
         super(listenerContainer);
+    }
+
+    @Override
+    protected void doRegister(RedisMessageListenerContainer listenerContainer) {
+        listenerContainer.addMessageListener(this, new PatternTopic("__keyevent@10__:expired"));
     }
 
     /**

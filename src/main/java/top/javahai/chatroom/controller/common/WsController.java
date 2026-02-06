@@ -1,17 +1,13 @@
 package top.javahai.chatroom.controller.common;
 
-import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
-import top.javahai.chatroom.constant.RedisConstant;
 import top.javahai.chatroom.entity.Message;
 import top.javahai.chatroom.entity.PrivateMsgContent;
-import top.javahai.chatroom.entity.User;
 import top.javahai.chatroom.entity.UserInfo;
 import top.javahai.chatroom.mapper.UserMapper;
 import top.javahai.chatroom.service.PrivateChatService;
@@ -19,7 +15,7 @@ import top.javahai.chatroom.utils.UserCacheUtil;
 
 import java.security.Principal;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 import static top.javahai.chatroom.constant.RedisConstant.FIRST_RESPONSE_TIMEOUT_KEY;
 import static top.javahai.chatroom.constant.RedisConstant.SESSION_KEY_PREFIX;
@@ -88,17 +84,17 @@ public class WsController {
       }
 
       // 4. 完善消息对象
-      message.setFrom(fromUser.getUsername());
-      message.setFromNickname(fromUser.getNickname());
+
       message.setFromUserProfile(fromUser.getUserProfile());
       message.setCreateTime(new Date());
       message.setFromId(fromId);
+      message.setToId(toUserId);
       if (message.getMessageTypeId() == null) {
         message.setMessageTypeId(1);
       }
-      message.setTo(toUserInfo.getUsername());
 
-      if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId() == 1) {
+
+      if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId().equals(1)) {
 
         // 尝试获取会话ID (如果消息里没传，就查一下)
         String currentConvId = message.getConversationId();
@@ -116,18 +112,74 @@ public class WsController {
             log.info("客服(ID:{}) 已响应会话 {}，移除超时倒计时", fromId, currentConvId);
           }
         }
+        // 发给普通用户，隐藏支撑人员的信息
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUserId), "/queue/chat", message);
+        // 支撑人员自己的界面回显
+        message.setFromNickname(fromUser.getNickname());
+        message.setTo(toUserInfo.getUsername());
+        message.setFrom(fromUser.getUsername());
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromId), "/queue/chat", message);
       }
 
-      // 5. 推送消息
-      // 接收者：使用从 Redis/DB 拿到的 username
-      simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUserId), "/queue/chat", message);
+      if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId().equals(0)){
+        message.setFromNickname(fromUser.getNickname());
+        message.setFrom(fromUser.getUsername());
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUserId), "/queue/chat", message);
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromId), "/queue/chat", message);
 
-      // 发送者回显：直接使用 principal 中的 username
-      simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromId), "/queue/chat", message);
+      }
 
     } catch (Exception e) {
       e.printStackTrace();
     }
   }
+
+  @MessageMapping("/chat/read")
+  public void handleReadReceipt(Principal principal, Map<String, Object> payload) {
+    try {
+      // 1. 获取当前操作人（谁读了消息）
+      Integer currentUserId = Integer.parseInt(principal.getName());
+
+      // 2. 查询当前用户身份 (为了区分逻辑)
+      UserInfo currentUser = userCacheUtil.getUserInfo(currentUserId);
+      if (currentUser == null) return;
+
+      // --- 分支 A: 我是客服 (UserTypeId == 1) ---
+      // 逻辑对应 PrivateChatController.updateMsgStateToRead
+      if (Integer.valueOf(1).equals(currentUser.getUserTypeId())) {
+        Object targetIdObj = payload.get("targetId");
+        if (targetIdObj != null) {
+          Integer targetId = Integer.parseInt(targetIdObj.toString());
+          // 调用 Service 更新 (客服读了 targetId 发的消息)
+          privateChatService.updateMsgStateToRead(targetId, currentUser.getId());
+        }
+      } else {
+        // --- 分支 B: 我是普通用户 (UserTypeId != 1) ---
+        // 逻辑对应 PrivateChatController.updateServiceMsgRead
+        Object domainIdObj = payload.get("domainId");
+        Object staffIdObj = payload.get("staffId"); // 可能为空
+
+        if (domainIdObj != null) {
+          Integer domainId = Integer.parseInt(domainIdObj.toString());
+          Integer staffId = null;
+          if (staffIdObj != null) {
+            staffId = Integer.parseInt(staffIdObj.toString());
+          }
+          // 调用 Service 更新 (用户读了 domainId 下 staffId 的消息)
+          privateChatService.updateServiceMsgRead(domainId, staffId, currentUser.getId());
+        }
+      }
+
+      // 3. 转发回执给对方 (保持原有的回显逻辑)
+      String toUser = (String) payload.get("to");
+      if (toUser != null) {
+        simpMessagingTemplate.convertAndSendToUser(toUser, "/queue/chat", payload);
+      }
+
+    } catch (Exception e) {
+      log.error("处理已读回执异常", e);
+    }
+  }
+
 }
 
