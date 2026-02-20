@@ -92,7 +92,7 @@ public class PrivateChatController {
             privateChatService.submitScore(conversationId, score);
             return RespBean.ok("评价提交成功");
         } catch (Exception e) {
-            return RespBean.error("评价提交失败：" + e.getMessage());
+            return RespBean.error(e.getMessage());
         }
     }
 

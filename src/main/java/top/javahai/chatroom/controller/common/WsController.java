@@ -104,14 +104,14 @@ public class WsController {
         }
 
         if (currentConvId != null) {
-          String key = FIRST_RESPONSE_TIMEOUT_KEY + currentConvId;
-          // 如果存在超时Key，说明是第一次回复，删除它
-          Boolean hasKey = stringRedisTemplate.hasKey(key);
+          String flagKey = "task:first_response:" + currentConvId;
+          Boolean hasKey = stringRedisTemplate.hasKey(flagKey);
           if (Boolean.TRUE.equals(hasKey)) {
-            stringRedisTemplate.delete(key);
-            log.info("客服(ID:{}) 已响应会话 {}，移除超时倒计时", fromId, currentConvId);
+            stringRedisTemplate.delete(flagKey);
+            log.info("客服(ID:{}) 已响应会话 {}，移除超时倒计时标记", fromId, currentConvId);
           }
         }
+
         // 发给普通用户，隐藏支撑人员的信息
         simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUserId), "/queue/chat", message);
         // 支撑人员自己的界面回显

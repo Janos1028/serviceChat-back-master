@@ -2,11 +2,13 @@ package top.javahai.chatroom.service.impl;
 
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import top.javahai.chatroom.config.RabbitMQConfig;
 import top.javahai.chatroom.context.BaseContext;
 import top.javahai.chatroom.entity.*;
 import top.javahai.chatroom.entity.vo.ConversationStartVO;
@@ -49,7 +51,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     private UserCacheUtil userCacheUtil;
     @Autowired
     private PrivateMsgContentMapper privateMsgContentMapper;
-
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     public String getConversationId(Integer domainId, Integer fromId, Integer toId, Integer serviceId) {
         // 0. 安全校验：检查发起者的身份
@@ -107,9 +110,14 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         sendWsStatus(fromId, toId, conversationId, "START", domainId, serviceId);
 
         if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
-            // Value: 客服ID (方便监听器知道是谁超时了)
-            // Time: 5 分钟
-            stringRedisTemplate.opsForValue().set(FIRST_RESPONSE_TIMEOUT_KEY + conversationId, toId.toString(), 5, TimeUnit.MINUTES);
+            // 1. 设置 Redis 标记
+            stringRedisTemplate.opsForValue().set("task:first_response:" + conversationId, "1");
+
+            // 2. 发送 MQ 延时消息
+            Map<String, Object> msg = new HashMap<>();
+            msg.put("type", "FIRST_RESPONSE");
+            msg.put("conversationId", conversationId);
+            rabbitTemplate.convertAndSend(RabbitMQConfig.DELAY_EXCHANGE_NAME, RabbitMQConfig.ROUNTING_KEY_5M, msg);
         }
         return conversationId;
     }
@@ -161,7 +169,11 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         // WS 状态通知
         sendWsStatus(conv.getUserId1(), conv.getUserId2(), conversationId, "END", null, null);
 
-        stringRedisTemplate.opsForValue().set(RATE_KEY_PREFIX + conversationId, "1", 30, TimeUnit.MINUTES);
+        // 发送自动好评延时消息
+        Map<String, Object> msg = new HashMap<>();
+        msg.put("type", "AUTO_RATING");
+        msg.put("conversationId", conversationId);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.DELAY_EXCHANGE_NAME, RabbitMQConfig.ROUNTING_KEY_30M, msg);
 
         PrivateMsgContent cardMsg = new PrivateMsgContent();
         cardMsg.setConversationId(conversationId);
@@ -320,13 +332,12 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         if (conv == null) {
             throw new RuntimeException("会话不存在");
         }
+        if (conv.getScore() != null){
+            throw new RuntimeException("该会话已评分");
+        }
 
         // 2. 更新数据库评分
         conversationMapper.updateScore(conversationId, score);
-
-        // 3. 用户已经评价了，立刻删除 Redis 里的倒计时 Key
-        // 这样监听器就不会再触发了 (拆除炸弹)
-        stringRedisTemplate.delete(RATE_KEY_PREFIX + conversationId);
     }
 
     @Override
@@ -438,12 +449,12 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
         Integer msgId = sysMsg.getId();
         if (msgId != null) {
-            String key = AUTO_CLOSE_KEY_PREFIX + conversationId + ":" + msgId;
-            // 设置 30 分钟过期
-            stringRedisTemplate.opsForValue().set(key, "1", 30, TimeUnit.MINUTES);
-            log.info("【自动结单】已启动倒计时 Key={}", key);
-        } else {
-            log.warn("【警告】消息插入后ID为空，无法设置自动结单定时器，请检查Mapper XML!");
+            Map<String, Object> msg = new HashMap<>();
+            msg.put("type", "AUTO_CLOSE");
+            msg.put("conversationId", conversationId);
+            msg.put("messageId", msgId);
+            rabbitTemplate.convertAndSend(RabbitMQConfig.DELAY_EXCHANGE_NAME, RabbitMQConfig.ROUNTING_KEY_30M, msg);
+            log.info("【自动结单】已发送 MQ 倒计时, convId={}", conversationId);
         }
 
 
