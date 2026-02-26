@@ -9,7 +9,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import top.javahai.chatroom.config.RabbitMQConfig;
-import top.javahai.chatroom.context.BaseContext;
 import top.javahai.chatroom.entity.*;
 import top.javahai.chatroom.entity.vo.ConversationStartVO;
 import top.javahai.chatroom.entity.vo.UserPrivateMsgContentVO;
@@ -23,7 +22,6 @@ import top.javahai.chatroom.service.PrivateChatService;
 import top.javahai.chatroom.utils.UserCacheUtil;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static top.javahai.chatroom.constant.ConversationConstant.*;
 import static top.javahai.chatroom.constant.PrivateChatMsg.*;
@@ -206,10 +204,6 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         return RespBean.ok("会话已关闭");
     }
 
-    @Override
-    public Map<Object, Object> getAllActiveSessions(Integer userId) {
-        return redisTemplate.opsForHash().entries(SESSION_KEY_PREFIX + userId);
-    }
 
     @Override
     public List<Integer> getUnreadSenders(Integer userId) {
@@ -643,6 +637,31 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         return null;
     }
 
+    @Override
+    public List<ConversationStartVO> getAllActiveSessions(Integer userId) {
+        // 1. 从 Redis 取出原始映射 { "对方ID": "会话ID" }
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(SESSION_KEY_PREFIX + userId);
+
+        List<ConversationStartVO> activeSessions = new ArrayList<>();
+
+        for (Map.Entry<Object, Object> entry : entries.entrySet()) {
+            String targetIdStr = (String) entry.getKey(); // 这永远是“对方”的真实 ID
+            String convId = (String) entry.getValue();
+
+            // 2. 统一查库获取完整会话信息，无视用户身份
+            PrivateChatConversation conv = privateChatConversationMapper.queryById(convId);
+            if (conv != null) {
+                ConversationStartVO vo = new ConversationStartVO();
+                vo.setConversationId(convId);
+                vo.setDomainId(conv.getServiceDomainId()); // 不管是谁，都把服务域ID塞进去
+                vo.setUserId(Integer.parseInt(targetIdStr)); // 不管是谁，都把对方的真实ID塞进去
+
+                activeSessions.add(vo);
+            }
+        }
+
+        return activeSessions;
+    }
 
     /**
      * 广播消息状态更新
@@ -688,8 +707,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
      */
     private PrivateMsgContent saveAndPushSystemMessage(ChatContext ctx, Integer type, String content, Integer state) {
         Integer domainId = ctx.getDomainId();
-        UserInfo fromUser = ctx.getFromUser();
-        UserInfo toUser = ctx.getToUser();
+        UserInfo fromUser = ctx.getFromUser(); // 动作发起方
+        UserInfo toUser = ctx.getToUser();     // 动作接收方
         String convId = ctx.getConversationId();
         String serviceName = ctx.getServiceName();
 
@@ -699,52 +718,67 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         sysMsg.setToId(toUser.getId());
         sysMsg.setContent(content);
         sysMsg.setCreateTime(new Date());
-        sysMsg.setMessageTypeId(type); // 4=Start, 5=End
+        sysMsg.setMessageTypeId(type); // 4=Start, 5=End, 7=结单确认
         sysMsg.setConversationId(convId);
         sysMsg.setServiceDomainId(domainId);
         sysMsg.setState(state);
         msgMapper.insert(sysMsg); // --- 写入 DB ---
 
-        // 3. 推送给 User1 (接收者用户)
-        Map<String, Object> msgFor1 = new HashMap<>();
-        msgFor1.put("content", content);
-        msgFor1.put("messageTypeId", type);
-        msgFor1.put("createTime", new Date());
-        msgFor1.put("conversationId", convId);
-        msgFor1.put("id", sysMsg.getId());
-        msgFor1.put("state", state);
-        msgFor1.put("serviceDomainId", domainId);
-        msgFor1.put("fromId", fromUser.getId());
-        msgFor1.put("to", toUser.getUsername());
-        if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 0) {
-            msgFor1.put("from", "service_" + domainId); // 虚拟账号
-            msgFor1.put("fromNickname", serviceName);      // 统一昵称
-        } else {
-            msgFor1.put("from", fromUser.getUsername());
-            msgFor1.put("fromNickname", fromUser.getNickname());
-        }
+        // ==========================================
+        // 2. 构建并发给【接收方 toUser】的消息
+        // ==========================================
+        Map<String, Object> msgForReceiver = new HashMap<>();
+        msgForReceiver.put("id", sysMsg.getId());
+        msgForReceiver.put("content", content);
+        msgForReceiver.put("messageTypeId", type);
+        msgForReceiver.put("createTime", new Date());
+        msgForReceiver.put("conversationId", convId);
+        msgForReceiver.put("state", state);
+        msgForReceiver.put("serviceDomainId", domainId);
+        msgForReceiver.put("to", toUser.getUsername());
 
-        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUser.getId()), "/queue/chat", msgFor1);
-
-        // 4. 推送给 User2 (发起者客服) - 客服可以看到真实的用户信息
-        Map<String, Object> msgFor2 = new HashMap<>();
-        msgFor2.put("content", content);
-        msgFor2.put("messageTypeId", type);
-        msgFor2.put("createTime", new Date());
-        msgFor2.put("from", fromUser.getUsername()); // 真实用户账号
-        msgFor2.put("fromNickname", fromUser.getNickname());
-        msgFor2.put("fromProfile", fromUser.getUserProfile());
-        msgFor2.put("conversationId", convId);
-        msgFor2.put("state", state);
-        msgFor2.put("id", sysMsg.getId());
-        msgFor2.put("fromId", fromUser.getId());
+        // 判断：如果接收方是普通用户，我们要把发送方(客服)伪装成虚拟服务号
         if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 0) {
-            msgFor1.put("to", "service_" + domainId); // 虚拟账号
+            msgForReceiver.put("from", "service_" + domainId);
+            msgForReceiver.put("fromNickname", serviceName != null ? serviceName : "系统");
+            msgForReceiver.put("fromId", fromUser.getId());
         } else {
-            msgFor1.put("to", toUser.getUsername());
+            // 接收方是客服，显示发起方(普通用户)的真实身份
+            msgForReceiver.put("from", fromUser.getUsername());
+            msgForReceiver.put("fromNickname", fromUser.getNickname());
+            msgForReceiver.put("fromProfile", fromUser.getUserProfile()); // ✅ 补上丢失的头像
+            msgForReceiver.put("fromId", fromUser.getId());
         }
-        msgFor2.put("to", toUser.getUsername());
-        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromUser.getId()), "/queue/chat", msgFor2);
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(toUser.getId()), "/queue/chat", msgForReceiver);
+
+
+        // ==========================================
+        // 3. 构建并发给【发起方 fromUser 自己】的回显消息
+        // ==========================================
+        Map<String, Object> msgForSender = new HashMap<>();
+        msgForSender.put("id", sysMsg.getId());
+        msgForSender.put("content", content);
+        msgForSender.put("messageTypeId", type);
+        msgForSender.put("createTime", new Date());
+        msgForSender.put("conversationId", convId);
+        msgForSender.put("state", state);
+        msgForSender.put("serviceDomainId", domainId);
+
+        // 自己看自己，永远显示真实信息
+        msgForSender.put("fromId", fromUser.getId());
+        msgForSender.put("from", fromUser.getUsername());
+        msgForSender.put("fromNickname", fromUser.getNickname());
+        msgForSender.put("fromProfile", fromUser.getUserProfile());
+
+        // 判断：如果我是普通用户，我发给对方，对方应该显示为虚拟号
+        if (fromUser.getUserTypeId() != null && fromUser.getUserTypeId() == 0) {
+            msgForSender.put("to", "service_" + domainId);
+        } else {
+            // 我是客服，发给普通用户，显示真实用户名
+            msgForSender.put("to", toUser.getUsername());
+        }
+        simpMessagingTemplate.convertAndSendToUser(String.valueOf(fromUser.getId()), "/queue/chat", msgForSender);
+
         return sysMsg;
     }
 
@@ -765,8 +799,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
         // 2. 创建消息对象 (注意方向：From Staff -> To User)
         PrivateMsgContent greeting = new PrivateMsgContent();
-        greeting.setFromId(staff.getId());  // 【修改】发送者是客服
-        greeting.setToId(user.getId());     // 【修改】接收者是用户
+        greeting.setFromId(staff.getId());  // 发送者是客服
+        greeting.setToId(user.getId());     // 接收者是用户
         greeting.setContent(content);
         greeting.setCreateTime(new Date());
         greeting.setMessageTypeId(1); // 普通文本消息

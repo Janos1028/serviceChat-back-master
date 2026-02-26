@@ -6,7 +6,6 @@ import top.javahai.chatroom.entity.vo.ConversationStartVO;
 import top.javahai.chatroom.entity.vo.UserPrivateMsgContentVO;
 
 import java.util.List;
-import java.util.Map;
 
 public interface PrivateChatService {
     RespBean closeConversation(String conversationId, Short isActive, Integer messageId);
@@ -15,7 +14,7 @@ public interface PrivateChatService {
     String getActiveConversationId(Integer userId1, Integer userId2);
 
     //获取某用户的所有活跃会话
-    Map<Object, Object> getAllActiveSessions(Integer userId);
+    List<ConversationStartVO> getAllActiveSessions(Integer userId);
     // 获取某用户所有未读会话
     List<Integer> getUnreadSenders(Integer userId);
 

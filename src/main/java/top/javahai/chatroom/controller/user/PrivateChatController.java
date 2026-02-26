@@ -148,8 +148,8 @@ public class PrivateChatController {
     @GetMapping("/active_sessions")
     public RespBean getAllActiveSessions() {
         User currentUser = (User) BaseContext.getCurrent();
-        Map<Object, Object> sessions = privateChatService.getAllActiveSessions(currentUser.getId());
-        return RespBean.ok(sessions);
+        List<ConversationStartVO> allActiveSessions = privateChatService.getAllActiveSessions(currentUser.getId());
+        return RespBean.ok(allActiveSessions);
     }
 
     /**
