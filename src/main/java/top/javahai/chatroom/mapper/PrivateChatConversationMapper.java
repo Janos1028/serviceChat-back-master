@@ -28,4 +28,6 @@ public interface PrivateChatConversationMapper {
     Short getScoreById(String conversationId);
 
     List<PrivateChatConversation> selectEndedConversationsForUser(Integer userId, Integer serviceDomainId, Date startDate);
+
+    int updateStateToClosed(String conversationId, Short isActive, Date date);
 }

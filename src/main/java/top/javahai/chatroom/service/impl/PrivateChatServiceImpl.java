@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import top.javahai.chatroom.service.PrivateChatService;
 import top.javahai.chatroom.utils.UserCacheUtil;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static top.javahai.chatroom.constant.ConversationConstant.*;
 import static top.javahai.chatroom.constant.PrivateChatMsg.*;
@@ -51,6 +53,8 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     private PrivateMsgContentMapper privateMsgContentMapper;
     @Autowired
     private RabbitTemplate rabbitTemplate;
+    @Autowired
+    private DefaultRedisScript<Long> unlockRedisScript;
 
     public String getConversationId(Integer domainId, Integer fromId, Integer toId, Integer serviceId) {
         // 0. 安全校验：检查发起者的身份
@@ -108,15 +112,21 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         sendWsStatus(fromId, toId, conversationId, "START", domainId, serviceId);
 
         if (toUser.getUserTypeId() != null && toUser.getUserTypeId() == 1) {
-            // 1. 设置 Redis 标记
-            stringRedisTemplate.opsForValue().set("task:first_response:" + conversationId, "1");
-
-            // 2. 发送 MQ 延时消息
+            // 将 set 改为 setIfAbsent (SETNX)，并设置 6 分钟过期时间（略长于 5 分钟的 MQ 延时，防死 Key）
+            String flagKey = "task:first_response:" + conversationId;
+            stringRedisTemplate.opsForValue().setIfAbsent(
+                    flagKey,
+                    "1",
+                    12,
+                    TimeUnit.HOURS
+            );
             Map<String, Object> msg = new HashMap<>();
             msg.put("type", "FIRST_RESPONSE");
             msg.put("conversationId", conversationId);
             rabbitTemplate.convertAndSend(RabbitMQConfig.DELAY_EXCHANGE_NAME, RabbitMQConfig.ROUNTING_KEY_5M, msg);
+            log.info("已为会话 {} 成功投递首问超时延时任务", conversationId);
         }
+
         return conversationId;
     }
 
@@ -134,15 +144,19 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         if (conv == null) {
             return RespBean.error("会话不存在");
         }
-        if (conv.getIsActive().equals(FORCE_END) || conv.getIsActive().equals(CLOSE_CONVERSATION)) {
-            return RespBean.error("会话已结束");
+
+        int updatedRows = conversationMapper.updateStateToClosed(conversationId, isActive, new Date());
+        if (updatedRows == 0) {
+            // 被其他线程抢先，直接拦截
+            return RespBean.error("会话已结束，请勿重复操作");
         }
+
         if (messageId != null) {
             broadcastConvConfirm(conversationId, messageId, conv, CONFIRM);
         }
         conv.setIsActive(isActive);
         conv.setEndTime(new Date());
-        conversationMapper.update(conv);
+       // conversationMapper.update(conv);
 
         UserInfo user1 = userCacheUtil.getUserInfo(conv.getUserId1());
         UserInfo user2 = userCacheUtil.getUserInfo(conv.getUserId2());
@@ -216,7 +230,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
      * @param fromId
      */
     @Override
-    public void updateMsgStateToRead(Integer fromId,Integer currentUserId) {
+    public void updateMsgStateToRead(Integer fromId, Integer currentUserId) {
 
         // 1. 数据库更新：将 fromId 发给 currentUserId 的消息标记为已读
         msgMapper.updateMsgStateToRead(fromId, currentUserId);
@@ -326,7 +340,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         if (conv == null) {
             throw new RuntimeException("会话不存在");
         }
-        if (conv.getScore() != null){
+        if (conv.getScore() != null) {
             throw new RuntimeException("该会话已评分");
         }
 
@@ -368,6 +382,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         UserInfo staffUser = userCacheUtil.getUserInfo(staffId);
 
         try {
+
             // A. 给【用户】发 (仅用户可见)
             sendPrivateSystemMessage(
                     serviceDomainId,
@@ -389,7 +404,6 @@ public class PrivateChatServiceImpl implements PrivateChatService {
             this.transferConversation(conversationId, serviceId, serviceDomainId, FIRST_RESPONSE_CONVERSATION);
         } catch (Exception e) {
 
-            log.error("超时转接失败，执行强制关闭。ID: {}, 原因: {}", conversationId, e.getMessage());
 
             String failReason = "当前暂无其他支撑人员在线";
 
@@ -404,6 +418,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
 
 
             // 5. 强制关闭
+            log.error("超时转接失败，执行强制关闭。ID: {}, 原因: {}", conversationId, e.getMessage());
             try {
                 this.closeConversation(conversationId, FIRST_RESPONSE_CONVERSATION, null);
             } catch (Exception ex) {
@@ -515,7 +530,7 @@ public class PrivateChatServiceImpl implements PrivateChatService {
      * 发送单向可见的系统消息
      * 解决双重推送问题，确保只有目标用户能看到
      */
-    private void sendPrivateSystemMessage(Integer domainId, UserInfo targetUser, Integer otherUserId,String convId, String content) {
+    private void sendPrivateSystemMessage(Integer domainId, UserInfo targetUser, Integer otherUserId, String convId, String content) {
         // 1. 存入数据库
         // 关键点：From 和 To 都是自己。
         // 这样对方查历史记录(Where from=对方 or to=对方)时，查不到这条消息。
@@ -536,15 +551,15 @@ public class PrivateChatServiceImpl implements PrivateChatService {
         msg.put("messageTypeId", 5);
         msg.put("createTime", new Date());
         msg.put("conversationId", convId);
-        msg.put("userTypeId",targetUser.getUserTypeId());
+        msg.put("userTypeId", targetUser.getUserTypeId());
         // 填充必要字段，防止前端报错
         msg.put("from", targetUser.getUsername());
         msg.put("to", targetUser.getUsername());
         msg.put("fromId", targetUser.getId());
         msg.put("toId", targetUser.getId());
-        if (targetUser.getUserTypeId() == 0){
+        if (targetUser.getUserTypeId() == 0) {
             msg.put("serviceDomainId", domainId);
-        }else {
+        } else {
             msg.put("otherUserId", otherUserId);
         }
         // 3. 只推送一次！
@@ -559,26 +574,45 @@ public class PrivateChatServiceImpl implements PrivateChatService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ConversationStartVO startServiceConversation(Integer domainId, Integer serviceId, Integer userId) {
-        // 3. 调用原有的开启会话逻辑，此时 toId 变为具体的员工ID
-        int count = userMapper.isHasActiveConversationInDomain(domainId, userId);
-        if (count > 0) {
-            throw new StartConversationFailedException("当前服务中心已有正在进行的会话，请先结束当前服务后再开启新的会话");
-        }
-        // 1. 获取该服务分类下所有在线的支撑人员
-        List<Integer> supporterList = userMapper.getOnlineSupporterByServiceId(domainId, serviceId);
-        if (supporterList == null || supporterList.isEmpty()) {
-            throw new StartConversationFailedException("抱歉，当前该服务团队暂无在线人员，请稍后再试");
+        String lockKey = "lock:start_conv:domain:" + domainId + ":user:" + userId;
+        // 构建唯一的 Value (线程ID + 纳秒级时间戳)
+        String lockValue = Thread.currentThread().getId() + "_" + System.nanoTime();
+        // 尝试获取锁，设置 3 秒过期时间
+        Boolean isLocked = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 3, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(isLocked)) {
+            // 没抢到锁，说明该用户在 3 秒内对【同一个服务域】有多次点击
+            throw new StartConversationFailedException("操作过于频繁，请稍后再试");
         }
 
-        // 2. 选择当前会话最少以及在线状态的支撑人员
-        Integer selectedStaffId = supporterList.get(0);
-        String conversationId = getConversationId(domainId, userId, selectedStaffId, serviceId);
+        try {
+            // 3. 调用原有的开启会话逻辑，此时 toId 变为具体的员工ID
+            int count = userMapper.isHasActiveConversationInDomain(domainId, userId);
+            if (count > 0) {
+                throw new StartConversationFailedException("当前服务中心已有正在进行的会话，请先结束当前服务后再开启新的会话");
+            }
+            // 1. 获取该服务分类下所有在线的支撑人员
+            List<Integer> supporterList = userMapper.getOnlineSupporterByServiceId(domainId, serviceId);
+            if (supporterList == null || supporterList.isEmpty()) {
+                throw new StartConversationFailedException("抱歉，当前该服务团队暂无在线人员，请稍后再试");
+            }
 
-        ConversationStartVO conversationStartVO = new ConversationStartVO();
-        conversationStartVO.setConversationId(conversationId);
-        conversationStartVO.setDomainId(domainId);
-        conversationStartVO.setUserId(selectedStaffId);
-        return conversationStartVO;
+            // 2. 选择当前会话最少以及在线状态的支撑人员
+            Integer selectedStaffId = supporterList.get(0);
+            String conversationId = getConversationId(domainId, userId, selectedStaffId, serviceId);
+
+            ConversationStartVO conversationStartVO = new ConversationStartVO();
+            conversationStartVO.setConversationId(conversationId);
+            conversationStartVO.setDomainId(domainId);
+            conversationStartVO.setUserId(selectedStaffId);
+            return conversationStartVO;
+        } finally {
+            stringRedisTemplate.execute(
+                    unlockRedisScript,
+                    java.util.Collections.singletonList(lockKey),
+                    lockValue
+            );
+        }
     }
 
 

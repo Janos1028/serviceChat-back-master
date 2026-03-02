@@ -48,11 +48,9 @@ public class RabbitTaskListener {
                 }
 
             } else if ("AUTO_RATING".equals(type)) {
-                Short score = conversationMapper.getScoreById(conversationId);
-                if (score == null) {
-                    conversationMapper.updateScore(conversationId, (short)5);
-                    log.info("已为会话 {} 自动好评", conversationId);
-                }
+
+                conversationMapper.updateScore(conversationId, (short)5);
+                log.info("已为会话 {} 自动好评", conversationId);
 
             } else if ("AUTO_CLOSE".equals(type)) {
                 Integer messageId = (Integer) msg.get("messageId");

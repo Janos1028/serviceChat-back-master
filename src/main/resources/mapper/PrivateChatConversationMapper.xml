@@ -29,6 +29,14 @@
         UPDATE private_chat_conversation
         SET score = #{score}
         WHERE id = #{conversationId}
+        AND score IS NULL
+    </update>
+    <update id="updateStateToClosed">
+        UPDATE private_chat_conversation
+        SET is_active = #{isActive},
+            end_time  = #{date}
+        WHERE id = #{conversationId}
+          AND is_active IN (1, 3)
     </update>
 
     <select id="queryById" resultMap="BaseResultMap">

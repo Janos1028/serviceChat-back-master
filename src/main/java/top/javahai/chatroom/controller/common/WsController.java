@@ -105,10 +105,10 @@ public class WsController {
 
         if (currentConvId != null) {
           String flagKey = "task:first_response:" + currentConvId;
-          Boolean hasKey = stringRedisTemplate.hasKey(flagKey);
-          if (Boolean.TRUE.equals(hasKey)) {
-            stringRedisTemplate.delete(flagKey);
-            log.info("客服(ID:{}) 已响应会话 {}，移除超时倒计时标记", fromId, currentConvId);
+          Boolean deleted = stringRedisTemplate.delete(flagKey);
+          if (Boolean.TRUE.equals(deleted)) {
+            // 只有真正成功拔掉旗帜的那个线程，才会打印这条日志
+            log.info("客服(ID:{}) 已首次响应会话 {}，成功移除超时倒计时标记", fromId, currentConvId);
           }
         }
 
