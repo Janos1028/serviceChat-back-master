@@ -8,9 +8,9 @@
 
 **项目演示：**https://www.bilibili.com/video/BV15gfvBzEZg/?spm_id_from=333.1387.upload.video_card.click
 
-**前端源码：**https://gitee.com/janos1028/service-chat_vue
+**前端源码：**https://github.com/Janos1028/serviceChat-vue-master
 
-**后端源码：**https://gitee.com/janos1028/service-chat_back
+**后端源码：**https://github.com/Janos1028/serviceChat-back-master
 
 ## ✨ 核心功能特性
 
